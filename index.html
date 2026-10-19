@@ -6,11 +6,11 @@
   <title>Party Quest</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <div id="demo-banner" hidden>MODE DÉMO · FIREBASE NON CONFIGURÉ</div>
+  <div id="demo-banner" hidden>MODE DÉMO · config Firebase incomplète</div>
 
   <main id="app">
     <!-- Chargement -->
@@ -34,10 +34,10 @@
       <div class="box profile">
         <img id="menu-avatar" alt="">
         <div class="stats">
-          <p id="p-name" class="pname"></p>
-          <p>NV&nbsp;&nbsp;<span id="p-level"></span></p>
-          <p>EXP&nbsp;<span id="p-xp"></span></p>
-          <p>OR&nbsp;&nbsp;<span id="p-gold"></span> G</p>
+          <p class="stat"><span id="p-name" class="pname"></span><span>NV <span id="p-level"></span></span></p>
+          <p class="stat"><span>EXP</span><span id="p-xp"></span></p>
+          <div class="bar"><i id="p-xpbar" style="width:0%"></i></div>
+          <p class="stat"><span>OR</span><span><span id="p-gold"></span> G</span></p>
         </div>
       </div>
       <div class="box menu">
@@ -89,8 +89,8 @@
           <ul id="game-party" class="party compact"></ul>
         </div>
         <div class="box keys">
-          <p>←↑↓→ ZQSD</p>
-          <p>: BOUGER</p>
+          <p>Flèches / ZQSD</p>
+          <p>pour se déplacer</p>
           <button id="btn-quit" class="btn small ghost">QUITTER</button>
         </div>
       </aside>

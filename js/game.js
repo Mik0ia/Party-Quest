@@ -1,8 +1,8 @@
 import { World, T, isWater } from './world.js';
 import { buildTiles, playerSprite, avatarURL, MINIMAP_COLORS } from './sprites.js';
-import { NES, PLAYER_COLORS } from './palette.js';
+import { C, PLAYER_COLORS, playerTint } from './palette.js';
 
-const BASE_W = 256, BASE_H = 224, TS = 16; // résolution de référence NES, tuiles 16x16
+const BASE_W = 240, BASE_H = 160, TS = 16; // résolution de référence GBA, tuiles 16x16
 const MOVE_MS = 160;                   // durée d'un pas d'une tuile
 const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 // e.code = position physique de la touche : WASD en QWERTY = ZQSD en AZERTY
@@ -173,63 +173,103 @@ export class Game {
     const m = this.me;
     const VW = this.vw, VH = this.vh;
     const cx = Math.round(m.x * TS + TS / 2 - VW / 2);
-    const cy = Math.round(m.y * TS + TS / 2 - VH / 2);
-    const wf = Math.floor(now / 450) & 1;
+    const cy = Math.round(m.y * TS - VH / 2);
+    const wf = Math.floor(now / 260) & 3;
+    const W = this.world;
 
-    // Terrain
+    // 1. Sol
     const x0 = Math.floor(cx / TS), y0 = Math.floor(cy / TS);
-    for (let ty = y0; ty <= y0 + Math.ceil(VH / TS) + 1; ty++) {
-      for (let tx = x0; tx <= x0 + Math.ceil(VW / TS) + 1; tx++) {
-        const t = this.world.tile(tx, ty);
+    const x1 = x0 + Math.ceil(VW / TS) + 1, y1 = y0 + Math.ceil(VH / TS) + 2;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const t = W.tile(tx, ty);
         const sx = tx * TS - cx, sy = ty * TS - cy;
         g.drawImage(this.tiles.get(t, wf), sx, sy);
-        if (isWater(t)) this.drawShore(g, tx, ty, sx, sy, wf);
+        if (isWater(t)) this.drawShore(g, tx, ty, sx, sy);
       }
     }
 
-    // Personnages, triés de haut en bas pour la profondeur
-    const ents = [...this.ents.values()].filter((e) => e.placed).sort((a, b) => a.y - b.y);
-    g.font = '8px "Press Start 2P", monospace';
-    g.textAlign = 'center';
-    g.textBaseline = 'bottom';
-    for (const e of ents) {
-      const meta = this.meta.get(e.uid);
-      const color = meta?.color ?? 0;
+    // 2. Arbres visibles (2x2 tuiles) + leur ombre au sol
+    const trees = [];
+    const seen = new Set();
+    for (let ty = y0; ty <= y1 + 1; ty++) {
+      for (let tx = x0 - 1; tx <= x1; tx++) {
+        const tr = W.tree(tx, ty);
+        if (!tr) continue;
+        const k = tr.ax * 100003 + tr.ay;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        trees.push(tr);
+      }
+    }
+    g.fillStyle = 'rgba(20, 60, 30, 0.28)';
+    for (const tr of trees) {
+      const sx = tr.ax * TS - cx, sy = tr.ay * TS - cy;
+      g.fillRect(sx + 6, sy + 29, 20, 3);
+      g.fillRect(sx + 9, sy + 32, 14, 1);
+    }
+
+    // 3. Arbres et personnages triés par leur base : on passe derrière les feuillages
+    const drawables = [];
+    for (const tr of trees) drawables.push({ base: tr.ay + 1.5, tree: tr });
+    for (const e of this.ents.values()) if (e.placed) drawables.push({ base: e.y + 0.5, ent: e });
+    drawables.sort((a, b) => a.base - b.base);
+
+    for (const d of drawables) {
+      if (d.tree) {
+        g.drawImage(this.tiles.tree(d.tree.kind), d.tree.ax * TS - cx, d.tree.ay * TS - cy);
+        continue;
+      }
+      const e = d.ent;
+      const color = this.meta.get(e.uid)?.color ?? 0;
       const walking = e.moving || now - e.stopAt < 60;
       const frame = walking ? 1 + (Math.floor(now / MOVE_MS) & 1) : 0;
       const sx = Math.round(e.x * TS - cx), sy = Math.round(e.y * TS - cy);
-      g.fillStyle = 'rgba(0,0,0,0.35)';
-      g.fillRect(sx + 4, sy + 15, 8, 1);
-      g.drawImage(playerSprite(color, e.dir, frame), sx, sy - 1);
-      if (meta && e !== m) this.drawName(g, meta.name, sx + 8, sy - 2, PLAYER_COLORS[color].tunic);
+      g.fillStyle = 'rgba(20, 40, 30, 0.3)';
+      g.fillRect(sx + 3, sy + 14, 10, 2);
+      g.fillRect(sx + 5, sy + 16, 6, 1);
+      g.drawImage(playerSprite(color, e.dir, frame), sx, sy - 17);
+    }
+
+    // 4. Noms au-dessus des têtes (toujours visibles, même derrière un arbre)
+    g.font = '8px "Pixelify Sans", monospace';
+    g.textAlign = 'center';
+    g.textBaseline = 'bottom';
+    for (const e of this.ents.values()) {
+      if (!e.placed || e === m) continue;
+      const meta = this.meta.get(e.uid);
+      if (!meta) continue;
+      const sx = Math.round(e.x * TS - cx), sy = Math.round(e.y * TS - cy);
+      this.drawName(g, meta.name, sx + 8, sy - 10, playerTint(meta.color));
     }
 
     if (now - this.lastMini > 200) { this.lastMini = now; this.renderMinimap(); }
   }
 
-  drawShore(g, tx, ty, sx, sy, wf) {
-    // Écume blanche le long des berges, qui ondule d'une frame à l'autre
-    // Écume tramée (1 pixel sur 2) le long des berges, qui ondule d'une frame à l'autre
+  drawShore(g, tx, ty, sx, sy) {
+    // Berge en terre et galets (style RPG 16-bit) sur les côtés de l'eau qui touchent la terre
     const land = (x, y) => !isWater(this.world.tile(x, y));
-    const edges = [
-      [land(tx, ty - 1), (i) => [sx + i, sy], (i) => [sx + i, sy + 1]],
-      [land(tx, ty + 1), (i) => [sx + i, sy + 15], (i) => [sx + i, sy + 14]],
-      [land(tx - 1, ty), (i) => [sx, sy + i], (i) => [sx + 1, sy + i]],
-      [land(tx + 1, ty), (i) => [sx + 15, sy + i], (i) => [sx + 14, sy + i]],
-    ];
-    for (const [isLand, outer, inner] of edges) {
-      if (!isLand) continue;
+    const [dk, md, lt, hi] = C.shore;
+    const band = (horizontal, fixed, inward) => {
       for (let i = 0; i < 16; i++) {
-        g.fillStyle = (i + wf) & 1 ? NES.white : NES.sky;
-        g.fillRect(...outer(i), 1, 1);
-        if (((i + wf) & 3) === 0) { g.fillStyle = NES.white; g.fillRect(...inner(i), 1, 1); }
+        const cells = [[fixed, dk], [fixed + inward, (i & 1) ? md : lt], [fixed + 2 * inward, (i % 4 === 0) ? hi : md]];
+        for (const [o, col] of cells) {
+          g.fillStyle = col;
+          if (horizontal) g.fillRect(sx + i, sy + o, 1, 1); else g.fillRect(sx + o, sy + i, 1, 1);
+        }
+        g.fillStyle = C.water[0];
+        if (horizontal) g.fillRect(sx + i, sy + fixed + 3 * inward, 1, 1); else g.fillRect(sx + fixed + 3 * inward, sy + i, 1, 1);
       }
-    }
+    };
+    if (land(tx, ty - 1)) band(true, 0, 1);
+    if (land(tx, ty + 1)) band(true, 15, -1);
+    if (land(tx - 1, ty)) band(false, 0, 1);
+    if (land(tx + 1, ty)) band(false, 15, -1);
   }
 
   drawName(g, name, x, y, color) {
-    g.fillStyle = NES.black;
-    for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.fillText(name, x + ox, y + oy);
+    g.fillStyle = C.outline;
+    for (const [ox, oy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [1, 1]]) g.fillText(name, x + ox, y + oy);
     g.fillStyle = color;
     g.fillText(name, x, y);
   }
@@ -250,12 +290,11 @@ export class Game {
     }
     g.putImageData(img, 0, 0);
     for (const e of this.ents.values()) {
-      const col = PLAYER_COLORS[this.meta.get(e.uid)?.color ?? 0].tunic;
       const px = e.tx - ox, py = e.ty - oy;
       if (px < 0 || py < 0 || px >= MINI || py >= MINI) continue;
-      g.fillStyle = NES.black;
+      g.fillStyle = C.white;
       g.fillRect(px - 2, py - 2, 5, 5);
-      g.fillStyle = col;
+      g.fillStyle = playerTint(this.meta.get(e.uid)?.color ?? 0);
       g.fillRect(px - 1, py - 1, 3, 3);
     }
   }

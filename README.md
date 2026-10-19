@@ -1,6 +1,6 @@
 # Party Quest
 
-Party game RPG multijoueur 8-bit dans le navigateur : crée une room, invite tes amis avec un code, et explorez ensemble un overworld généré procéduralement.
+Party game RPG multijoueur 16-bit dans le navigateur : crée une room, invite tes amis avec un code, et explorez ensemble un overworld généré procéduralement.
 
 HTML / JavaScript pur (aucune compilation), Firebase pour les comptes et le temps réel, GitHub Pages pour l'hébergement.
 
@@ -9,9 +9,9 @@ HTML / JavaScript pur (aucune compilation), Firebase pour les comptes et le temp
 - Connexion Google, avec un compte par joueur : niveau 1, 0 EXP, 0 or (pas encore utilisés)
 - Créer ou rejoindre une room avec un code à 4 caractères, ou avec un lien `?room=CODE`
 - Salon jusqu'à 5 joueurs, puis l'hôte lance la partie
-- Overworld infini généré en bruit de Perlin à partir d'une seed par room : forêts, lacs, berges ; l'eau est infranchissable
+- Overworld infini généré en bruit de Perlin à partir d'une seed par room : forêts, lacs, berges. L'eau, les buissons et les troncs bloquent ; les arbres font 2×2 cases et on passe derrière leur feuillage
 - Déplacements sur grille, réplication de la position et de l'orientation de chaque joueur
-- Direction artistique NES : palette 2C02, sprites 16×16 dessinés pixel par pixel dans `js/sprites.js`, minimap, croix directionnelle tactile sur mobile
+- Direction artistique 16-bit (style GBA) : arbres 32×32 et personnages 16×32 dessinés en code dans `js/sprites.js`, ombrage avec trame, eau animée ; chaque joueur a une palette imposée (rouge, bleu, vert, violet, or)
 - Mode démo (solo + 2 bots) actif tant que Firebase n'est pas configuré, ou avec `?demo` dans l'URL
 
 ## Mise en place
@@ -47,7 +47,7 @@ python3 -m http.server 8000
 | `js/world.js` | Génération de l'overworld |
 | `js/noise.js` | Bruit de Perlin seedé |
 | `js/sprites.js` | Pixel art (personnages, tuiles) |
-| `js/palette.js` | Palette NES et couleurs des joueurs |
+| `js/palette.js` | Palette 16-bit et dégradés des joueurs |
 | `database.rules.json` | Règles de sécurité de la Realtime Database |
 
 ## Données (Realtime Database)

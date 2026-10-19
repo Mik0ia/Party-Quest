@@ -1,6 +1,6 @@
 import { firebaseConfig } from './config.js';
 import { Game } from './game.js';
-import { avatarURL, brickPatternURL } from './sprites.js';
+import { avatarURL, backgroundPatternURL } from './sprites.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -37,6 +37,7 @@ function showMenu(profile) {
   $('p-level').textContent = profile.level;
   $('p-xp').textContent = profile.xp;
   $('p-gold').textContent = profile.gold;
+  $('p-xpbar').style.width = `${Math.min(100, (profile.xp / (profile.level * 100)) * 100)}%`;
   $('menu-avatar').src = avatarURL(0);
   show('menu');
 }
@@ -141,7 +142,7 @@ async function leave(message) {
 /* ───────── Démarrage ───────── */
 
 async function boot() {
-  document.body.style.setProperty('--bricks', `url(${brickPatternURL()})`);
+  document.body.style.setProperty('--grass', `url(${backgroundPatternURL()})`);
   $('title-party').innerHTML = [0, 1, 2, 3, 4].map((i) => `<img alt="" src="${avatarURL(i)}">`).join('');
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) document.body.classList.add('touch');
 
