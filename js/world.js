@@ -15,6 +15,14 @@ export const T = {
   // Formations rocheuses (falaises) : 3 couches selon la hauteur du relief
   TOP1: 15, TOP2: 16, TOP3: 17,     // dessus d'un plateau rocheux de couche 1, 2 ou 3
   FACE1: 18, FACE2: 19, FACE3: 20,  // paroi de falaise sous un plateau de couche 1, 2 ou 3
+  BRIDGE: 21,   // pont de bois (2 cases de large) au-dessus de l'eau : traversable
+};
+
+// Règles des ponts
+export const BRIDGE = {
+  MIN: 3, MAX: 8,   // longueur au-dessus de l'eau (en cases)
+  FLANK: 3,         // cases d'eau minimum de chaque côté du pont
+  CELL: 16,         // au plus un pont par zone de 16x16 cases
 };
 
 // Seuils de hauteur du bruit de Perlin (valeurs de -0.7 à 0.7 environ) :
@@ -42,6 +50,7 @@ export class World {
     this.patch = new Perlin((this.seed ^ 0x2545f491) >>> 0);
     this.cache = new Map();
     this.anchors = new Map();
+    this.bridgeCells = new Map();
     this._spawn = null;
   }
 
@@ -92,7 +101,7 @@ export class World {
     for (let dy = 0; dy < 2; dy++)
       for (let dx = 0; dx < 2; dx++) {
         const b = this.base(ax + dx, ay + dy);
-        if (![T.GRASS, T.GRASS2, T.FLOWERS, T.TALL].includes(b)) return 0; // jamais sur la roche
+        if (![T.GRASS, T.GRASS2, T.FLOWERS, T.TALL].includes(b) || this.bridgeAt(ax + dx, ay + dy)) return 0; // ni roche ni pont
       }
     // Couleur de la tente : 1 rouge, 2 bleue
     return 1 + (hash2(ax, ay, this.seed ^ 0x99) < 0.5 ? 0 : 1);
@@ -118,11 +127,97 @@ export class World {
       for (let dy = 0; dy < 2 && k; dy++)
         for (let dx = 0; dx < 2 && k; dx++) {
           const b = this.base(ax + dx, ay + dy);
-          if (isWater(b) || isCliff(b) || b === T.PATH || this.tentOf(ax + dx, ay + dy)) k = 0;
+          if (isWater(b) || isCliff(b) || b === T.PATH || this.tentOf(ax + dx, ay + dy) || this.bridgeAt(ax + dx, ay + dy)) k = 0;
         }
     }
     this.anchors.set(key, k);
     return k;
+  }
+
+  /* ───────── Ponts ─────────
+     Un pont part d'un bord de terre de 2 cases de large face à 2 cases d'eau,
+     traverse 3 à 8 cases d'eau et rejoint la terre en face, avec au moins
+     3 cases d'eau de chaque côté sur toute sa partie centrale. */
+
+  isLand(x, y) {
+    const b = this.base(x, y);
+    return !isWater(b) && !isCliff(b);
+  }
+
+  isWaterAt(x, y) {
+    return isWater(this.base(x, y));
+  }
+
+  // Cherche un pont qui part de (x, y) vers l'est ('h') ou vers le sud ('v')
+  tryBridge(x, y, dir) {
+    const [ux, uy, px, py] = dir === 'h' ? [1, 0, 0, 1] : [0, 1, 1, 0]; // avance / largeur
+    const at = (i, j) => [x + ux * i + px * j, y + uy * i + py * j];
+    // départ : 2 cases de terre côte à côte, puis 2 cases d'eau juste devant
+    for (const j of [0, 1]) {
+      if (!this.isLand(...at(0, j))) return null;
+      if (!this.isWaterAt(...at(1, j))) return null;
+    }
+    let len = 0;
+    for (let i = 1; i <= BRIDGE.MAX + 1; i++) {
+      const w0 = this.isWaterAt(...at(i, 0)), w1 = this.isWaterAt(...at(i, 1));
+      if (w0 && w1) { len++; continue; }
+      if (this.isLand(...at(i, 0)) && this.isLand(...at(i, 1))) break; // terre en face
+      return null;                                                    // rive irrégulière
+    }
+    if (len < BRIDGE.MIN || len > BRIDGE.MAX) return null;
+    // de l'eau de chaque côté du pont (on tolère les rives sur la première et la dernière case)
+    for (let i = 2; i < len; i++) {
+      for (let k = 1; k <= BRIDGE.FLANK; k++) {
+        if (!this.isWaterAt(...at(i, -k)) || !this.isWaterAt(...at(i, 1 + k))) return null;
+      }
+    }
+    return { x, y, dir, len };
+  }
+
+  // Ponts d'une zone de CELL x CELL cases (au plus un, choisi de façon déterministe)
+  bridgesIn(cx, cy) {
+    const key = cx * 100003 + cy;
+    let list = this.bridgeCells.get(key);
+    if (list) return list;
+    let best = null, bestScore = -1;
+    const N = BRIDGE.CELL;
+    for (let y = cy * N; y < cy * N + N; y++) {
+      for (let x = cx * N; x < cx * N + N; x++) {
+        // test rapide : il faut une rive (terre puis eau à l'est ou au sud)
+        const eastWater = this.isWaterAt(x + 1, y), southWater = this.isWaterAt(x, y + 1);
+        if (!eastWater && !southWater) continue;
+        for (const dir of ['h', 'v']) {
+          if (dir === 'h' && !eastWater) continue;
+          if (dir === 'v' && !southWater) continue;
+          const b = this.tryBridge(x, y, dir);
+          if (!b) continue;
+          // on préfère les ponts qui prolongent un chemin
+          const endX = dir === 'h' ? x + b.len + 1 : x, endY = dir === 'h' ? y : y + b.len + 1;
+          const score = (this.isPath(x, y) || this.isPath(endX, endY) ? 2 : 0) + hash2(x, y, this.seed ^ 0xb1d6);
+          if (score > bestScore) { bestScore = score; best = b; }
+        }
+      }
+    }
+    list = best ? [best] : [];
+    this.bridgeCells.set(key, list);
+    return list;
+  }
+
+  // Infos du pont qui passe sur (x, y) : { dir, side (0 ou 1 : côté du pont), i (1..len), len, landing }
+  bridgeAt(x, y) {
+    const N = BRIDGE.CELL;
+    const cx = Math.floor(x / N), cy = Math.floor(y / N);
+    for (let dy = -1; dy <= 0; dy++) {
+      for (let dx = -1; dx <= 0; dx++) {
+        for (const b of this.bridgesIn(cx + dx, cy + dy)) {
+          const i = b.dir === 'h' ? x - b.x : y - b.y;      // position le long du pont
+          const side = b.dir === 'h' ? y - b.y : x - b.x;   // 0 ou 1 en largeur
+          if (side < 0 || side > 1 || i < 0 || i > b.len + 1) continue;
+          return { dir: b.dir, side, i, len: b.len, landing: i === 0 || i === b.len + 1 };
+        }
+      }
+    }
+    return null;
   }
 
   // Colonne de sapins (x pair) qui contient la tuile x
@@ -135,8 +230,11 @@ export class World {
     let t = this.cache.get(key);
     if (t === undefined) {
       const ax = this.colOf(x);
-      const tent = this.tentOf(x, y);
-      if (tent) t = y === tent.ay ? T.TENT_TOP : T.TENT_BOT;
+      const br = this.bridgeAt(x, y);
+      const tent = br ? null : this.tentOf(x, y);
+      if (br && !br.landing) t = T.BRIDGE;
+      else if (br) t = this.base(x, y) === T.PATH ? T.PATH : T.GRASS; // débouché du pont dégagé
+      else if (tent) t = y === tent.ay ? T.TENT_TOP : T.TENT_BOT;
       else if (this.treeAt(ax, y - 1)) t = T.TREE_BOT;       // tronc d'un sapin qui démarre au-dessus
       else if (this.treeAt(ax, y)) t = T.TREE_TOP;      // haut d'un sapin
       else t = this.base(x, y);

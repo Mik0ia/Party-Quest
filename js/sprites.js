@@ -537,6 +537,55 @@ function boulderOverlay(level) {
   return c;
 }
 
+/* ───────────────────────── PONTS ─────────────────────────
+   Tablier de planches avec garde-corps sur le côté extérieur et gros poteaux aux
+   deux extrémités. Dessiné pour un pont est-ouest puis tourné pour un pont nord-sud. */
+
+function bridgeTileH(side, pos) {
+  const [dk, md, lt, hi] = C.wood;
+  const c = canvas(16, 16);
+  const g = c.getContext('2d');
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      const k = x & 3, plank = x >> 2;
+      let col = k === 0 ? dk : k === 1 ? hi : plank & 1 ? md : lt;
+      if (k === 2 && (y === 4 || y === 11)) col = dk;          // clous
+      px(g, x, y, col);
+    }
+  }
+  // garde-corps côté extérieur (en haut pour le côté 0, en bas pour le côté 1)
+  const r0 = side === 0 ? 0 : 11;
+  for (let x = 0; x < 16; x++) {
+    px(g, x, r0, C.outline);
+    px(g, x, r0 + 1, hi);
+    px(g, x, r0 + 2, md);
+    px(g, x, r0 + 3, dk);
+    px(g, x, r0 + 4, C.outline);
+  }
+  // poteaux réguliers et gros poteaux d'extrémité
+  const post = (x, w) => {
+    for (let y = r0 - (side === 0 ? 0 : 2); y <= r0 + 4; y++) {
+      if (y < 0 || y > 15) continue;
+      for (let i = 0; i < w; i++) px(g, x + i, y, i === 0 ? C.outline : i === w - 1 ? dk : lt);
+    }
+  };
+  post(7, 3);
+  if (pos === 'start') post(0, 4);
+  if (pos === 'end') post(12, 4);
+  // ombre de la planche sur le bord intérieur
+  for (let x = 0; x < 16; x++) px(g, x, side === 0 ? 15 : 0, md);
+  return c;
+}
+
+function rotate(src) {
+  const c = canvas(16, 16);
+  const g = c.getContext('2d');
+  g.translate(0, 16);
+  g.rotate(-Math.PI / 2);
+  g.drawImage(src, 0, 0);
+  return c;
+}
+
 /* ───────────────────────── API ───────────────────────── */
 
 export function buildTiles() {
@@ -559,6 +608,7 @@ export function buildTiles() {
     [T.TOP1]: cliffTop(1), [T.TOP2]: cliffTop(2), [T.TOP3]: cliffTop(3),
     [T.FACE1]: cliffFace(1, 0, true, true), [T.FACE2]: cliffFace(2, 0, true, true), [T.FACE3]: cliffFace(3, 0, true, true),
   };
+  const bridges = new Map();
   const faceCache = new Map();
   const face = (l, v, top, bot) => {
     const k = `${l}${v}${+top}${+bot}`;
@@ -581,6 +631,16 @@ export function buildTiles() {
     cliffSide(level, right) { return sides[level - 1][right ? 1 : 0]; },
     cliffRim(level) { return rims[level - 1]; },
     face(level, x, top, bottom) { return face(level, x & 1, top, bottom); },
+    // dir 'h' (est-ouest) ou 'v' (nord-sud), side 0/1, pos 'start' | 'mid' | 'end'
+    bridge(dir, side, pos) {
+      const k = dir + side + pos;
+      if (!bridges.has(k)) {
+        const h = bridgeTileH(side, pos);
+        // tourné de -90° : le côté 0 (garde-corps en haut) passe à gauche ; start devient en haut
+        bridges.set(k, dir === 'h' ? h : rotate(bridgeTileH(side, pos === 'start' ? 'end' : pos === 'end' ? 'start' : 'mid')));
+      }
+      return bridges.get(k);
+    },
     boulder(level) { return boulders[level - 1]; },
   };
 }
@@ -594,6 +654,7 @@ export const MINIMAP_COLORS = {
   [T.SIGN]: C.wood[2], [T.BARREL]: C.wood[1], [T.TENT_TOP]: '#E86858', [T.TENT_BOT]: '#C03838',
   [T.TOP1]: C.cliffTop[0][2], [T.TOP2]: C.cliffTop[1][2], [T.TOP3]: C.cliffTop[2][3],
   [T.FACE1]: C.cliffFace[0][1], [T.FACE2]: C.cliffFace[1][1], [T.FACE3]: C.cliffFace[2][1],
+  [T.BRIDGE]: C.wood[3],
 };
 
 // Fond de page : la tuile d'herbe en motif

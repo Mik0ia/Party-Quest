@@ -11,6 +11,7 @@ HTML / JavaScript pur (aucune compilation), Firebase pour les comptes et le temp
 - Salon jusqu'à 5 joueurs, puis l'hôte lance la partie
 - Overworld infini généré en bruit de Perlin (seed par room) : forêts de sapins 2×2, lacs aux bords arrondis, chemins de sable sinueux, herbes hautes, fleurs. L'eau, les buissons, les rochers et les troncs bloquent ; on passe derrière le feuillage des sapins
 - Formations rocheuses : quand le relief (bruit de Perlin) dépasse des seuils de hauteur, des plateaux de roche apparaissent, jusqu'à 3 couches superposées avec parois de falaise et ombres portées (seuils réglables dans `ELEV`, `js/world.js`) ; rendu inspiré des montagnes GBA : sol rocheux, rebords de pierres arrondies, parois en colonnes de roche
+- Ponts de bois générés automatiquement : 2 cases de large, partent d'un bord de terre face à 2 cases d'eau, traversent 3 à 8 cases d'eau jusqu'à la terre d'en face, avec au moins 3 cases d'eau de chaque côté (règles dans `BRIDGE`, `js/world.js`) ; au plus un pont par zone de 16×16 cases
 - Déplacements sur grille, réplication de la position et de l'orientation de chaque joueur
 - Direction artistique médiévale façon GBA (tout est dessiné en code dans `js/sprites.js`) : petits aventuriers 16×32 (hitbox d'une case), tête nue, tabard et cape aux couleurs du joueur ; tentes de campement, panneaux, tonneaux, sapins ; interface en parchemin. Palettes imposées : rouge, bleu, vert, violet, or
 - Mode démo (solo + 2 bots) actif tant que Firebase n'est pas configuré, ou avec `?demo` dans l'URL

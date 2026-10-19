@@ -193,8 +193,13 @@ export class Game {
           // paroi : rebord seulement en haut d'une falaise, pied seulement en bas
           const top = !isFace(W.tile(tx, ty - 1)), bottom = !isFace(W.tile(tx, ty + 1));
           g.drawImage(this.tiles.face(cliffLevel(t), tx, top, bottom), sx, sy);
+        } else if (t === T.BRIDGE) {
+          // pont : l'eau dessous, puis le tablier
+          const b = W.bridgeAt(tx, ty);
+          g.drawImage(this.tiles.get(T.WATER, wf), sx, sy);
+          g.drawImage(this.tiles.bridge(b.dir, b.side, b.i === 1 ? 'start' : b.i === b.len ? 'end' : 'mid'), sx, sy);
         } else g.drawImage(this.tiles.get(t, wf, tx, ty), sx, sy);
-        if (isWater(t)) this.drawShore(g, tx, ty, sx, sy);
+        if (isWater(t)) { this.drawShore(g, tx, ty, sx, sy); this.drawBridgeShadow(g, tx, ty, sx, sy); }
         else if (t === T.PATH) this.drawPathEdge(g, tx, ty, sx, sy);
         if (isCliff(t)) this.drawCliffEdges(g, t, tx, ty, sx, sy);
         else if (isFace(W.tile(tx, ty - 1))) this.drawCliffShadow(g, sx, sy);
@@ -274,7 +279,7 @@ export class Game {
   // L'eau est en contrebas : talus de terre visible sur la berge nord (face à la caméra),
   // talus plus fin sur les côtés, simple rebord d'herbe au sud, ombre portée sur l'eau.
   drawShore(g, tx, ty, sx, sy) {
-    const land = (x, y) => !isWater(this.world.tile(x, y));
+    const land = (x, y) => { const t = this.world.tile(x, y); return !isWater(t) && t !== T.BRIDGE; };
     const n = land(tx, ty - 1), s = land(tx, ty + 1), w = land(tx - 1, ty), e = land(tx + 1, ty);
     const nw = land(tx - 1, ty - 1), ne = land(tx + 1, ty - 1);
     if (!(n || s || w || e || nw || ne)) return;
@@ -360,6 +365,14 @@ export class Game {
     if (!lowN && !lowW && !lowE && ((tx * 73856093) ^ (ty * 19349663)) % 13 === 0) {
       g.drawImage(this.tiles.boulder(lvl), sx, sy);
     }
+  }
+
+  // Ombre du pont projetée sur l'eau (au sud d'un pont est-ouest, à l'est d'un pont nord-sud)
+  drawBridgeShadow(g, tx, ty, sx, sy) {
+    const W = this.world;
+    g.fillStyle = 'rgba(10, 20, 50, 0.35)';
+    if (W.tile(tx, ty - 1) === T.BRIDGE && W.bridgeAt(tx, ty - 1).dir === 'h') g.fillRect(sx, sy, 16, 3);
+    if (W.tile(tx - 1, ty) === T.BRIDGE && W.bridgeAt(tx - 1, ty).dir === 'v') g.fillRect(sx, sy, 3, 16);
   }
 
   // Ombre portée au pied d'une falaise
