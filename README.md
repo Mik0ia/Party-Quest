@@ -1,6 +1,6 @@
 # Party Quest
 
-Party game RPG multijoueur 16-bit dans le navigateur : crée une room, invite tes amis avec un code, et explorez ensemble un overworld généré procéduralement.
+Party game RPG médiéval multijoueur, style 16-bit, dans le navigateur : crée une room, invite tes amis avec un code, et explorez ensemble un overworld généré procéduralement.
 
 HTML / JavaScript pur (aucune compilation), Firebase pour les comptes et le temps réel, GitHub Pages pour l'hébergement.
 
@@ -11,7 +11,7 @@ HTML / JavaScript pur (aucune compilation), Firebase pour les comptes et le temp
 - Salon jusqu'à 5 joueurs, puis l'hôte lance la partie
 - Overworld infini généré en bruit de Perlin (seed par room) : forêts de sapins 2×2, lacs aux bords arrondis, chemins de sable sinueux, herbes hautes, fleurs. L'eau, les buissons, les rochers et les troncs bloquent ; on passe derrière le feuillage des sapins
 - Déplacements sur grille, réplication de la position et de l'orientation de chaque joueur
-- Direction artistique façon GBA (tileset original généré en code dans `js/sprites.js`) : herbe menthe, sapins 32×32, personnages 16×32 avec une hitbox d'une case ; chaque joueur a une palette imposée (rouge, bleu, vert, violet, or)
+- Direction artistique médiévale façon GBA (tout est dessiné en code dans `js/sprites.js`) : petits chevaliers 16×32 (hitbox d'une case) au casque à plumet, tabard et cape aux couleurs du joueur ; tentes de campement, panneaux, tonneaux, sapins ; interface en parchemin. Palettes imposées : rouge, bleu, vert, violet, or
 - Mode démo (solo + 2 bots) actif tant que Firebase n'est pas configuré, ou avec `?demo` dans l'URL
 
 ## Mise en place

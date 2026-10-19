@@ -195,6 +195,8 @@ export class Game {
     for (let ay = y0 - 1; ay <= y1; ay++) {
       for (let ax = W.colOf(x0 - 1); ax <= x1; ax += 2) {
         if (W.treeAt(ax, ay)) trees.push({ ax, ay });
+        const kind = W.tentAt(ax, ay);
+        if (kind) trees.push({ ax, ay, tent: kind });
       }
     }
     // 3. Arbres et personnages triés par leur base : on passe derrière les feuillages
@@ -205,7 +207,7 @@ export class Game {
 
     for (const d of drawables) {
       if (d.tree) {
-        g.drawImage(this.tiles.tree(), d.tree.ax * TS - cx, d.tree.ay * TS - cy);
+        g.drawImage(d.tree.tent ? this.tiles.tent(d.tree.tent) : this.tiles.tree(), d.tree.ax * TS - cx, d.tree.ay * TS - cy);
         continue;
       }
       const e = d.ent;

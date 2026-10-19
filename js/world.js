@@ -8,8 +8,12 @@ export const T = {
   TREE_TOP: 9,  // rangée haute d'un sapin 2x2 : on passe derrière le feuillage
   TREE_BOT: 10, // rangée basse (tronc) : bloquante. Un sapin placé juste en dessous
                 // pose sa rangée haute sur ce tronc : les colonnes de sapins sont étanches.
+  SIGN: 11,     // panneau de bois au bord des chemins : bloquant
+  BARREL: 12,   // tonneau : bloquant
+  TENT_TOP: 13, // haut d'une tente de campement 2x2 : on passe derrière
+  TENT_BOT: 14, // bas de la tente : bloquant
 };
-const BLOCKING = new Set([T.DEEP, T.WATER, T.BUSH, T.ROCK, T.TREE_BOT]);
+const BLOCKING = new Set([T.DEEP, T.WATER, T.BUSH, T.ROCK, T.TREE_BOT, T.SIGN, T.BARREL, T.TENT_BOT]);
 
 export const isWater = (t) => t === T.DEEP || t === T.WATER;
 
@@ -32,13 +36,40 @@ export class World {
     if (e < -0.24) return T.DEEP;
     if (e < -0.12) return T.WATER;
     // Chemins de sable : le long des "crêtes" d'un bruit basse fréquence → tracés sinueux
-    if (Math.abs(this.paths.fbm(x / 34, y / 34, 2)) < 0.032) return T.PATH;
+    if (this.isPath(x, y)) return T.PATH;
     const r = hash2(x, y, this.seed);
+    // Panneaux indicateurs plantés le long des chemins
+    if (r < 0.05 && (this.isPath(x + 1, y) || this.isPath(x - 1, y)) && hash2(x, y, this.seed ^ 0x5151) < 0.3) return T.SIGN;
+    if (r > 0.996) return T.BARREL;
     if (this.patch.fbm(x / 9, y / 9, 2) > 0.22) return T.TALL;
-    if (r < 0.012) return T.ROCK;
+    if (r < 0.008) return T.ROCK;
     if (r < 0.03) return T.BUSH;
     if (r < 0.07) return T.FLOWERS;
     return r < 0.55 ? T.GRASS : T.GRASS2;
+  }
+
+  isPath(x, y) {
+    return Math.abs(this.paths.fbm(x / 34, y / 34, 2)) < 0.032;
+  }
+
+  // Tentes de campement 2x2 dans les clairières (grille de 2x2, donc jamais superposées)
+  tentAt(ax, ay) {
+    if ((ax & 1) || (ay & 1)) return 0;
+    if (hash2(ax, ay, this.seed ^ 0x7e47) > 0.012) return 0;
+    if (this.veg.fbm(ax / 12, ay / 12, 3) > -0.02) return 0;
+    for (let dy = 0; dy < 2; dy++)
+      for (let dx = 0; dx < 2; dx++) {
+        const b = this.base(ax + dx, ay + dy);
+        if (![T.GRASS, T.GRASS2, T.FLOWERS, T.TALL].includes(b)) return 0;
+      }
+    // Couleur de la tente : 1 rouge, 2 bleue
+    return 1 + (hash2(ax, ay, this.seed ^ 0x99) < 0.5 ? 0 : 1);
+  }
+
+  tentOf(x, y) {
+    const ax = this.colOf(x), ay = y - (((y % 2) + 2) % 2);
+    const k = this.tentAt(ax, ay);
+    return k ? { ax, ay, kind: k } : null;
   }
 
   // Sapins de 2x2 tuiles : colonnes alignées tous les 2 x, mais un sapin peut démarrer
@@ -55,7 +86,7 @@ export class World {
       for (let dy = 0; dy < 2 && k; dy++)
         for (let dx = 0; dx < 2 && k; dx++) {
           const b = this.base(ax + dx, ay + dy);
-          if (isWater(b) || b === T.PATH) k = 0;
+          if (isWater(b) || b === T.PATH || this.tentOf(ax + dx, ay + dy)) k = 0;
         }
     }
     this.anchors.set(key, k);
@@ -72,7 +103,9 @@ export class World {
     let t = this.cache.get(key);
     if (t === undefined) {
       const ax = this.colOf(x);
-      if (this.treeAt(ax, y - 1)) t = T.TREE_BOT;       // tronc d'un sapin qui démarre au-dessus
+      const tent = this.tentOf(x, y);
+      if (tent) t = y === tent.ay ? T.TENT_TOP : T.TENT_BOT;
+      else if (this.treeAt(ax, y - 1)) t = T.TREE_BOT;       // tronc d'un sapin qui démarre au-dessus
       else if (this.treeAt(ax, y)) t = T.TREE_TOP;      // haut d'un sapin
       else t = this.base(x, y);
       if (this.cache.size > 200000) { this.cache.clear(); this.anchors.clear(); }

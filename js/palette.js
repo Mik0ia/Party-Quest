@@ -19,10 +19,13 @@ export const C = {
 
   // Personnages
   skin: ['#C88068', '#F0B090', '#FFD8B8'],
-  hair: ['#4E2C1C', '#7E4A2A', '#B07040', '#D89A60'],
-  shirt: ['#B8B8D0', '#F8F8F8'],
-  pants: ['#283048', '#3C4868', '#566488'],
+  steel: ['#4A5068', '#7C86A0', '#B4BED0', '#EEF2FF'],
+  leather: ['#4A3020', '#6E4C30'],
+  gold: '#F8C840',
   shoes: ['#3A2418', '#6A4028'],
+  // Décor médiéval
+  canvas: ['#B8A07C', '#E0CCA4', '#F8ECCC'],                        // toile de tente
+  wood: ['#4A2C1C', '#7A4C2C', '#A8703C', '#D09A5C'],
   eye: '#283048',
 };
 

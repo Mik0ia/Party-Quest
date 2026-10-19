@@ -54,54 +54,58 @@ function blob(m, cx, cy, rx, ry, levels, bias = 0) {
 }
 
 /* ───────────────────────── PERSONNAGES (16x32) ─────────────────────────
-   Héros original : cheveux bruns en épis, bandeau et veste aux couleurs du joueur,
-   t-shirt blanc, pantalon sombre. Lettres :
-   O contour · 1-4 dégradé joueur · a b c d cheveux · S s h peau · E yeux
-   W w t-shirt · P p q pantalon · B k chaussures */
+   Petit chevalier médiéval original : casque d'acier à plumet, tabard et cape
+   aux couleurs du joueur, ceinture à boucle dorée, bottes de cuir. Lettres :
+   O contour · 1-4 dégradé joueur · 5-8 acier (sombre → reflet) · S s h peau · E yeux
+   L ceinture · Y boucle dorée · P p chausses · B k bottes */
 
 const half = (rows) => rows.map((r) => r + [...r].reverse().join(''));
 
+const HELMET = [
+  '.......O', '......O4', '.....O43', '....OO32', '...O7766', '..O78766', '.O677666', '.O555555',
+];
 const FRONT_HEAD = half([
-  '.....O.O', '....OcOd', '...Ocdcd', '..Obccdc', '..O44444', '.Ob33333',
-  '.ObaS3SS', '.OaSSSSS', '.OaSESSS', '.OaSEhSS', '..OsSSSS', '...OOsss',
+  ...HELMET,
+  '.O6OSSSS', '.O6OSESS', '.O5OSEhS', '..OOsSSS', '...OOsss',
 ]);
 const BACK_HEAD = half([
-  '.....O.O', '....OcOd', '...Ocdcd', '..Obccdc', '..O44444', '.Ob33333',
-  '.Obbcccc', '.Oabbccc', '.Oaabbcc', '.Oaaabbb', '..Oaaabb', '...OOsss',
+  ...HELMET,
+  '.O6O6666', '.O6O6676', '.O5O5666', '..OO5566', '...OO555',
 ]);
 const FRONT_BODY = half([
-  '...OO3Ww', '..O432WW', '.O3O32WW', '.O3O22Ww', '.OSO2222', '..OOPPPP',
+  '..OO6776', '.O2O3443', '.O2O3443', '.O1SLLLY', '.O1O3333', '..O1O22O',
 ]);
 const BACK_BODY = half([
-  '...OO333', '..O43333', '.O3O3333', '.O3O3222', '.OSO2222', '..OOPPPP',
+  '..OO6776', '.O2O1222', '.O2O2232', '.O1S2232', '.O1O1222', '..O1O111',
 ]);
-const FRONT_LEGS = half(['...OqPPp', '...OPPpO', '...OBBkO', '...OOOOO']);
+const FRONT_LEGS = half(['...OPPpO', '...OBBkO', '...OOOOO']);
 
 const SIDE_HEAD = [
-  '......O.O.......',
-  '.....OcOdO......',
-  '....OcdcdcO.....',
-  '...ObccdcdcO....',
-  '..O4444444cO....',
-  '..O33333334bO...',
-  '.OS3SSSSbb43bO..',
-  '.OSSSSSSabbbbO..',
-  'OSESSSSSaabbaO..',
-  '.OEhSSSsSaaaO...',
-  '..OsSSSsOaaO....',
-  '...OOssOOOO.....',
+  '.......OO.......',
+  '......O43O......',
+  '.....O432O......',
+  '....OO32OOO.....',
+  '...O7766666O....',
+  '..O787666665O...',
+  '..O6776666655O..',
+  '.O555555555555O.',
+  '.OSSSSO666665O..',
+  'OSESSSO666655O..',
+  '.OShSSO66655O...',
+  '..OsSSOO555O....',
+  '...OOOO.OOO.....',
 ];
 const SIDE_BODY = [
-  '....O3WW33O.....',
-  '....O4O3332O....',
-  '....O3O3322O....',
-  '....O3O2222O....',
-  '....OSO2222O....',
-  '....OOPPPPPO....',
+  '....O6776O2O....',
+  '....O34436O21O..',
+  '....O3SS43O21O..',
+  '....OLLYLLO11O..',
+  '....O33333O11O..',
+  '.....O22O2O1O...',
 ];
 const SIDE_LEGS = [
-  ['.....OPPPpO.....', '.....OPPPpO.....', '....OBBBkkO.....', '....OOOOOOO.....'],
-  ['....OPPOOPpO....', '...OPPO.OPpO....', '..OBBkO..OBkO...', '..OOOOO..OOOO...'],
+  ['.....OPPpO......', '....OBBBkO......', '....OOOOOO......'],
+  ['....OPPOpPO.....', '...OBBkOOBkO....', '...OOOO.OOOO....'],
 ];
 
 // Pas de marche vu de face/dos : une jambe remonte d'un pixel
@@ -144,10 +148,10 @@ export function playerSprite(colorIdx, dir, frame) {
   const ramp = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length].ramp;
   const map = {
     O: C.outline, 1: ramp[0], 2: ramp[1], 3: ramp[2], 4: ramp[3],
-    a: C.hair[0], b: C.hair[1], c: C.hair[2], d: C.hair[3],
+    5: C.steel[0], 6: C.steel[1], 7: C.steel[2], 8: C.steel[3],
     S: C.skin[1], s: C.skin[0], h: C.skin[2], E: C.eye,
-    W: C.shirt[1], w: C.shirt[0],
-    P: C.pants[1], p: C.pants[0], q: C.pants[2], B: C.shoes[1], k: C.shoes[0],
+    L: C.leather[0], Y: C.gold,
+    P: C.leather[1], p: C.leather[0], B: C.shoes[1], k: C.shoes[0],
   };
   const rows = charRows(dir, frame);
   const mirror = dir === 'r';
@@ -342,6 +346,97 @@ function pineTree() {
   return c;
 }
 
+/* ───────────────────────── DÉCOR MÉDIÉVAL ───────────────────────── */
+
+// Panneau indicateur en bois
+function sign() {
+  const c = grass(1);
+  const g = c.getContext('2d');
+  const [dk, md, lt, hi] = C.wood;
+  g.fillStyle = C.grass[0];
+  g.fillRect(5, 14, 6, 1);
+  // poteau
+  for (let y = 8; y <= 14; y++) { px(g, 6, y, C.outline); px(g, 7, y, lt); px(g, 8, y, md); px(g, 9, y, C.outline); }
+  // planche
+  for (let y = 2; y <= 8; y++) {
+    for (let x = 1; x <= 14; x++) {
+      const edge = y === 2 || y === 8 || x === 1 || x === 14;
+      px(g, x, y, edge ? C.outline : y === 3 ? hi : y === 7 ? md : lt);
+    }
+  }
+  // inscriptions gravées
+  for (const [x0, x1, y] of [[3, 9, 4], [3, 11, 6]]) for (let x = x0; x <= x1; x += (x % 3 === 2 ? 2 : 1)) px(g, x, y, dk);
+  return c;
+}
+
+// Tonneau cerclé de fer
+function barrel() {
+  const c = grass(2);
+  const g = c.getContext('2d');
+  const [dk, md, lt, hi] = C.wood;
+  g.fillStyle = C.grass[0];
+  g.fillRect(3, 14, 10, 2);
+  for (let y = 3; y <= 14; y++) {
+    const bulge = y > 4 && y < 13 ? 1 : 0;
+    const x0 = 3 - bulge, x1 = 12 + bulge;
+    for (let x = x0; x <= x1; x++) {
+      const t = (x - x0) / (x1 - x0);
+      let col = t < 0.25 ? hi : t < 0.55 ? lt : t < 0.8 ? md : dk;
+      if (y === 5 || y === 11) col = t < 0.4 ? C.steel[2] : C.steel[1];
+      if (x === x0 || x === x1 || y === 14) col = C.outline;
+      px(g, x, y, col);
+    }
+  }
+  // couvercle
+  for (let x = 4; x <= 11; x++) { px(g, x, 2, C.outline); px(g, x, 3, x < 7 ? hi : lt); }
+  px(g, 3, 3, C.outline); px(g, 12, 3, C.outline);
+  return c;
+}
+
+// Tente de campement conique (32x32) à bandes, comme un bivouac d'aventuriers
+const TENT_COLORS = {
+  1: ['#7A1E24', '#C03838', '#E86858'],   // rouge
+  2: ['#1E3A80', '#3460C0', '#5A8CE8'],   // bleue
+};
+function tent(kind) {
+  const c = canvas(32, 32);
+  const g = c.getContext('2d');
+  const stripe = TENT_COLORS[kind];
+  const cloth = C.canvas;
+  // ombre au sol
+  g.fillStyle = C.grass[0];
+  for (let y = 27; y <= 31; y++) {
+    const hw = Math.round(14 * Math.sqrt(Math.max(0, 1 - ((y - 29) / 3) ** 2)));
+    g.fillRect(16 - hw, y, hw * 2, 1);
+  }
+  const m = makeMask(32, 30);
+  const ramp = [];
+  const top = 4, bot = 28;
+  for (let y = top; y <= bot; y++) {
+    const t = (y - top) / (bot - top);
+    const hw = 1 + t * 13 + (t > 0.9 ? 1 : 0);
+    for (let x = 0; x < 32; x++) {
+      const u = (x + 0.5 - 16) / hw;               // -1 (gauche) → 1 (droite)
+      if (Math.abs(u) > 1) continue;
+      const band = Math.floor((u + 1) * 3.5) & 1;  // bandes qui convergent vers le sommet
+      const light = clamp(Math.floor(1.6 - u * 1.1 + dither(x, y) * 0.8), 0, 2);
+      m.v[y * 32 + x] = band * 3 + light;
+    }
+  }
+  ramp.push(...cloth, ...stripe);
+  drawMask(g, m, ramp, C.outline);
+  // entrée : rabat ouvert sombre
+  for (let y = 18; y <= 28; y++) {
+    const hw = Math.round((y - 18) * 0.42);
+    for (let x = 16 - hw; x <= 16 + hw; x++) px(g, x, y, y > 26 ? '#1E1410' : '#3A2418');
+    px(g, 16 - hw - 1, y, cloth[2]); px(g, 16 + hw + 1, y, cloth[0]);
+  }
+  // perches croisées au sommet
+  for (let i = 0; i < 4; i++) { px(g, 14 + i, 3 - i, C.wood[1]); px(g, 18 - i, 3 - i, C.wood[2]); }
+  px(g, 13, 4, C.outline); px(g, 19, 4, C.outline);
+  return c;
+}
+
 /* ───────────────────────── API ───────────────────────── */
 
 export function buildTiles() {
@@ -357,7 +452,12 @@ export function buildTiles() {
     [T.ROCK]: rock(),
     [T.TREE_TOP]: g0,
     [T.TREE_BOT]: g1,
+    [T.SIGN]: sign(),
+    [T.BARREL]: barrel(),
+    [T.TENT_TOP]: g0,
+    [T.TENT_BOT]: g1,
   };
+  const tents = { 1: tent(1), 2: tent(2) };
   const orange = flowers(C.flowerOrange);
   const pine = pineTree();
   return {
@@ -366,6 +466,7 @@ export function buildTiles() {
       return fixed[type] || frames[frame & 3][type];
     },
     tree() { return pine; },
+    tent(kind) { return tents[kind]; },
   };
 }
 
@@ -375,6 +476,7 @@ export const MINIMAP_COLORS = {
   [T.GRASS]: C.grass[2], [T.GRASS2]: C.grass[2], [T.FLOWERS]: C.flowerRed[1],
   [T.TALL]: C.tall[2], [T.BUSH]: C.tall[1], [T.ROCK]: C.rock[2],
   [T.TREE_TOP]: C.pine[3], [T.TREE_BOT]: C.pine[2],
+  [T.SIGN]: C.wood[2], [T.BARREL]: C.wood[1], [T.TENT_TOP]: '#E86858', [T.TENT_BOT]: '#C03838',
 };
 
 // Fond de page : la tuile d'herbe en motif
