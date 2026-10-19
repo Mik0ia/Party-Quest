@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Party Quest</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="demo-banner" hidden>MODE DÉMO · FIREBASE NON CONFIGURÉ</div>
+
+  <main id="app">
+    <!-- Chargement -->
+    <section id="screen-loading" class="screen">
+      <div class="box"><p class="blink">CHARGEMENT...</p></div>
+    </section>
+
+    <!-- Connexion -->
+    <section id="screen-login" class="screen" hidden>
+      <h1 class="logo"><span>PARTY</span><span>QUEST</span></h1>
+      <div id="title-party" class="title-party"></div>
+      <div class="box center">
+        <button id="btn-google" class="btn">CONNEXION GOOGLE</button>
+      </div>
+      <p class="footer">© 2026 PARTY QUEST</p>
+    </section>
+
+    <!-- Menu principal -->
+    <section id="screen-menu" class="screen" hidden>
+      <h1 class="logo small"><span>PARTY</span><span>QUEST</span></h1>
+      <div class="box profile">
+        <img id="menu-avatar" alt="">
+        <div class="stats">
+          <p id="p-name" class="pname"></p>
+          <p>NV&nbsp;&nbsp;<span id="p-level"></span></p>
+          <p>EXP&nbsp;<span id="p-xp"></span></p>
+          <p>OR&nbsp;&nbsp;<span id="p-gold"></span> G</p>
+        </div>
+      </div>
+      <div class="box menu">
+        <button id="btn-create" class="btn">CRÉER UNE ROOM</button>
+        <div class="join">
+          <input id="join-code" maxlength="4" placeholder="CODE" autocomplete="off" spellcheck="false">
+          <button id="btn-join" class="btn">REJOINDRE</button>
+        </div>
+        <button id="btn-logout" class="btn ghost">DÉCONNEXION</button>
+      </div>
+    </section>
+
+    <!-- Salon -->
+    <section id="screen-lobby" class="screen" hidden>
+      <div class="box center">
+        <p class="label">ROOM</p>
+        <p id="lobby-code" class="code"></p>
+        <button id="btn-copy" class="btn small">COPIER LE LIEN</button>
+      </div>
+      <div class="box">
+        <p class="label">ÉQUIPE <span id="lobby-count">0</span>/5</p>
+        <ul id="lobby-players" class="party"></ul>
+      </div>
+      <div class="box center">
+        <button id="btn-start" class="btn" hidden>LANCER LA PARTIE</button>
+        <p id="lobby-wait" class="blink" hidden>EN ATTENTE DE L'HÔTE...</p>
+        <button id="btn-leave" class="btn ghost">QUITTER</button>
+      </div>
+    </section>
+
+    <!-- Partie -->
+    <section id="screen-game" class="screen game" hidden>
+      <div id="game-view" class="game-view">
+        <canvas id="game-canvas"></canvas>
+        <div id="dpad" class="dpad">
+          <button data-dir="u" class="up">▲</button>
+          <button data-dir="l" class="left">◀</button>
+          <button data-dir="r" class="right">▶</button>
+          <button data-dir="d" class="down">▼</button>
+        </div>
+      </div>
+      <aside class="game-panel">
+        <div class="box center">
+          <p class="label">OVERWORLD</p>
+          <p id="game-code" class="small-text"></p>
+          <canvas id="minimap" width="64" height="64"></canvas>
+        </div>
+        <div class="box">
+          <ul id="game-party" class="party compact"></ul>
+        </div>
+        <div class="box keys">
+          <p>←↑↓→ ZQSD</p>
+          <p>: BOUGER</p>
+          <button id="btn-quit" class="btn small ghost">QUITTER</button>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <div id="toast" hidden></div>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
