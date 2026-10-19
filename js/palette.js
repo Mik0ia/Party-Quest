@@ -1,24 +1,25 @@
 // Palette GBA : tons vifs mais doux, qui se fondent entre eux (herbe menthe, sable pâle, eau claire).
 export const C = {
-  outline: '#383048',
+  outline: '#201828',
   white: '#F8F8F8',
 
-  grass: ['#3E9070', '#56AE88', '#72C8A2', '#9EE0BE', '#C4F0D8'],      // sombre → clair
-  path: ['#C8A868', '#D8C07C', '#E8D896', '#F6EAB4'],
-  pathEdge: ['#A8D8A0', '#C4E0A0'],                                   // fondu herbe → sable
-  water: ['#3868A8', '#4E88E0', '#68A8F8', '#90C8FF', '#D0ECFF'],
-  deep: ['#4278D8', '#5490EA', '#68A6F4'],
-  bank: ['#5A3428', '#8A5A40', '#B07A58', '#D4A07C'],                // talus de terre des berges
-  pine: ['#1E4A30', '#2E7444', '#46A050', '#68C058', '#98DC6C', '#C8F094'],
-  tall: ['#1E5034', '#2C7848', '#3E9850', '#5AB860', '#88D470'],
-  rock: ['#4A2C28', '#7A4C40', '#A87060', '#D09A84', '#F0C8B0'],
-  bark: ['#4A2C20', '#70442C', '#946038'],
-  flowerRed: ['#B82830', '#F05040', '#F89078'],
-  flowerOrange: ['#D06018', '#F8A038', '#F8D070'],
+  grass: ['#3A7A2E', '#4E963A', '#68B04C', '#88C864', '#ACDE84'],      // sombre → clair
+  path: ['#A07840', '#BA9454', '#D0AC6C', '#E4C68A'],
+  pathEdge: ['#3E7E30', '#9C8048'],                                   // liseré herbe sombre → sable
+  water: ['#22346C', '#3E66C0', '#5486DA', '#78A8EE', '#B8D6F6'],
+  deep: ['#34569E', '#4068B8', '#527CCA'],
+  bank: ['#2E1C16', '#5C3A28', '#80553A', '#A47452'],                // talus de terre des berges
+  pine: ['#0E2414', '#183E22', '#24582C', '#357438', '#4C9244', '#72B05A'],
+  tall: ['#142E18', '#204C24', '#2E6A2E', '#448838', '#64A84C'],
+  rock: ['#2C1C1C', '#5E3E36', '#86604E', '#AE8670', '#D0AE94'],
+  bark: ['#2E1C14', '#553620', '#7A5030'],
+  flowerRed: ['#982030', '#D83C38', '#F07860'],
+  flowerOrange: ['#B85010', '#E88A28', '#F4C060'],
   flowerHeart: '#F8D840',
 
   // Personnages
   skin: ['#C88068', '#F0B090', '#FFD8B8'],
+  hair: ['#3A2014', '#623A1E', '#8C5A2C', '#B47E44'],
   steel: ['#4A5068', '#7C86A0', '#B4BED0', '#EEF2FF'],
   leather: ['#4A3020', '#6E4C30'],
   gold: '#F8C840',

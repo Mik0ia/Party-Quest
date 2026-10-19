@@ -2,7 +2,8 @@ import { World, T, isWater } from './world.js';
 import { buildTiles, playerSprite, avatarURL, MINIMAP_COLORS } from './sprites.js';
 import { C, PLAYER_COLORS, playerTint } from './palette.js';
 
-const BASE_W = 240, BASE_H = 160, TS = 16; // résolution de référence GBA, tuiles 16x16
+const TS = 16;                                // tuiles 16x16
+const VIEW_W = 21 * TS, VIEW_H = 15 * TS;     // taille de vue visée : 21 x 15 tuiles
 const MOVE_MS = 160;                   // durée d'un pas d'une tuile
 const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 // e.code = position physique de la touche : WASD en QWERTY = ZQSD en AZERTY
@@ -154,16 +155,20 @@ export class Game {
   /* ───────── Rendu ───────── */
 
   resize() {
-    // Échelle entière (pixels nets), puis on élargit la vue pour remplir tout l'espace
+    // Vue d'environ 21 x 15 tuiles ; le canvas est rendu à une échelle entière ≥ au zoom
+    // puis réduit légèrement par le navigateur, ce qui garde des pixels nets.
     const r = this.view.getBoundingClientRect();
-    const zoom = Math.max(r.width >= 280 ? 2 : 1, Math.floor(Math.min(r.width / BASE_W, r.height / BASE_H) + 0.35));
+    const dpr = window.devicePixelRatio || 1;
+    let zoom = Math.min(r.width / VIEW_W, r.height / VIEW_H);
+    zoom = Math.max(zoom, r.width < 500 ? 1.5 : 1);
     this.vw = Math.ceil(r.width / zoom);
     this.vh = Math.ceil(r.height / zoom);
-    this.canvas.style.width = `${this.vw * zoom}px`;
-    this.canvas.style.height = `${this.vh * zoom}px`;
-    this.scale = Math.max(1, Math.round(zoom * (window.devicePixelRatio || 1)));
+    this.scale = Math.max(1, Math.ceil(zoom * dpr - 0.01));
     this.canvas.width = this.vw * this.scale;
     this.canvas.height = this.vh * this.scale;
+    this.canvas.style.width = `${this.vw * zoom}px`;
+    this.canvas.style.height = `${this.vh * zoom}px`;
+    this.canvas.style.imageRendering = Math.abs(this.scale - zoom * dpr) < 0.02 ? 'pixelated' : 'auto';
   }
 
   render(now) {

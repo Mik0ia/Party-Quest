@@ -54,49 +54,45 @@ function blob(m, cx, cy, rx, ry, levels, bias = 0) {
 }
 
 /* ───────────────────────── PERSONNAGES (16x32) ─────────────────────────
-   Petit chevalier médiéval original : casque d'acier à plumet, tabard et cape
-   aux couleurs du joueur, ceinture à boucle dorée, bottes de cuir. Lettres :
-   O contour · 1-4 dégradé joueur · 5-8 acier (sombre → reflet) · S s h peau · E yeux
+   Petit aventurier médiéval original, tête nue : cheveux bruns en mèches, tabard et cape
+   aux couleurs du joueur, ceinture à boucle dorée, chausses et bottes de cuir. Lettres :
+   O contour · 1-4 dégradé joueur · a b c d cheveux · S s h peau · E yeux
    L ceinture · Y boucle dorée · P p chausses · B k bottes */
 
 const half = (rows) => rows.map((r) => r + [...r].reverse().join(''));
 
-const HELMET = [
-  '.......O', '......O4', '.....O43', '....OO32', '...O7766', '..O78766', '.O677666', '.O555555',
-];
+const HAIR_TOP = ['......OO', '....OOcc', '...Ocdcc', '..Obccdc', '..Obcccc', '.Obbcbcc'];
 const FRONT_HEAD = half([
-  ...HELMET,
-  '.O6OSSSS', '.O6OSESS', '.O5OSEhS', '..OOsSSS', '...OOsss',
+  ...HAIR_TOP,
+  '.ObbcSbS', '.ObSSSSS', '.OaSESSS', '.OaSEhSS', '..OsSSSS', '...OOsss',
 ]);
 const BACK_HEAD = half([
-  ...HELMET,
-  '.O6O6666', '.O6O6676', '.O5O5666', '..OO5566', '...OO555',
+  ...HAIR_TOP,
+  '.Obbcccc', '.Oabbccc', '.Oaabbcc', '.Oaaabbb', '..Oaaabb', '...OOsss',
 ]);
 const FRONT_BODY = half([
-  '..OO6776', '.O2O3443', '.O2O3443', '.O1SLLLY', '.O1O3333', '..O1O22O',
+  '..OO2332', '.O2O3443', '.O2O3443', '.O1SLLLY', '.O1O3333', '..O1O22O',
 ]);
 const BACK_BODY = half([
-  '..OO6776', '.O2O1222', '.O2O2232', '.O1S2232', '.O1O1222', '..O1O111',
+  '..OO2332', '.O2O1222', '.O2O2232', '.O1S2232', '.O1O1222', '..O1O111',
 ]);
 const FRONT_LEGS = half(['...OPPpO', '...OBBkO', '...OOOOO']);
 
 const SIDE_HEAD = [
-  '.......OO.......',
-  '......O43O......',
-  '.....O432O......',
-  '....OO32OOO.....',
-  '...O7766666O....',
-  '..O787666665O...',
-  '..O6776666655O..',
-  '.O555555555555O.',
-  '.OSSSSO666665O..',
-  'OSESSSO666655O..',
-  '.OShSSO66655O...',
-  '..OsSSOO555O....',
-  '...OOOO.OOO.....',
+  '.....OOOOO......',
+  '....OccdddO.....',
+  '...OccddccbO....',
+  '..OccccccbbbO...',
+  '..OcScccbbbbO...',
+  '.OSSSScbbbbaO...',
+  '.OSESSSSbbbaO...',
+  'OSSESSSSSbbaO...',
+  '.OhSSSSSsbaO....',
+  '..OsSSSSOaO.....',
+  '...OOssOOO......',
 ];
 const SIDE_BODY = [
-  '....O6776O2O....',
+  '....O2332O2O....',
   '....O34436O21O..',
   '....O3SS43O21O..',
   '....OLLYLLO11O..',
@@ -148,7 +144,7 @@ export function playerSprite(colorIdx, dir, frame) {
   const ramp = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length].ramp;
   const map = {
     O: C.outline, 1: ramp[0], 2: ramp[1], 3: ramp[2], 4: ramp[3],
-    5: C.steel[0], 6: C.steel[1], 7: C.steel[2], 8: C.steel[3],
+    a: C.hair[0], b: C.hair[1], c: C.hair[2], d: C.hair[3],
     S: C.skin[1], s: C.skin[0], h: C.skin[2], E: C.eye,
     L: C.leather[0], Y: C.gold,
     P: C.leather[1], p: C.leather[0], B: C.shoes[1], k: C.shoes[0],
