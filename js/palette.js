@@ -7,7 +7,8 @@ export const C = {
   path: ['#C8A868', '#D8C07C', '#E8D896', '#F6EAB4'],
   pathEdge: ['#A8D8A0', '#C4E0A0'],                                   // fondu herbe → sable
   water: ['#3868A8', '#4E88E0', '#68A8F8', '#90C8FF', '#D0ECFF'],
-  deep: ['#3460B8', '#4274D0', '#5288E0'],
+  deep: ['#4278D8', '#5490EA', '#68A6F4'],
+  bank: ['#5A3428', '#8A5A40', '#B07A58', '#D4A07C'],                // talus de terre des berges
   pine: ['#1E4A30', '#2E7444', '#46A050', '#68C058', '#98DC6C', '#C8F094'],
   tall: ['#1E5034', '#2C7848', '#3E9850', '#5AB860', '#88D470'],
   rock: ['#4A2C28', '#7A4C40', '#A87060', '#D09A84', '#F0C8B0'],

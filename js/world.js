@@ -5,8 +5,9 @@ export const T = {
   TALL: 6,      // herbes hautes : décor traversable
   BUSH: 7,      // buisson : bloquant
   ROCK: 8,      // rocher : bloquant
-  TREE_TOP: 9,  // moitié haute d'un sapin 2x2 : on passe derrière le feuillage
-  TREE_BOT: 10, // moitié basse (tronc) : bloquante
+  TREE_TOP: 9,  // rangée haute d'un sapin 2x2 : on passe derrière le feuillage
+  TREE_BOT: 10, // rangée basse (tronc) : bloquante. Un sapin placé juste en dessous
+                // pose sa rangée haute sur ce tronc : les colonnes de sapins sont étanches.
 };
 const BLOCKING = new Set([T.DEEP, T.WATER, T.BUSH, T.ROCK, T.TREE_BOT]);
 
@@ -40,7 +41,8 @@ export class World {
     return r < 0.55 ? T.GRASS : T.GRASS2;
   }
 
-  // Sapins de 2x2 tuiles, alignés en rangées comme dans les forêts des RPG GBA
+  // Sapins de 2x2 tuiles : colonnes alignées tous les 2 x, mais un sapin peut démarrer
+  // sur n'importe quelle ligne, donc chevaucher le sapin du dessus (comme dans Pokémon).
   treeAt(ax, ay) {
     const key = ax * 100003 + ay;
     let k = this.anchors.get(key);
@@ -48,7 +50,7 @@ export class World {
     k = 0;
     const v = this.veg.fbm(ax / 12, ay / 12, 3);
     const r = hash2(ax, ay, this.seed ^ 0x77);
-    if (v > 0.07 || (v > 0.01 && r < 0.4) || r < 0.012) {
+    if (v > 0.07 || (v > 0.01 && r < 0.3) || r < 0.006) {
       k = 1;
       for (let dy = 0; dy < 2 && k; dy++)
         for (let dx = 0; dx < 2 && k; dx++) {
@@ -60,18 +62,19 @@ export class World {
     return k;
   }
 
-  tree(x, y) {
-    const ax = x - (((x % 2) + 2) % 2);
-    const ay = y - (((y % 2) + 2) % 2);
-    return this.treeAt(ax, ay) ? { ax, ay } : null;
+  // Colonne de sapins (x pair) qui contient la tuile x
+  colOf(x) {
+    return x - (((x % 2) + 2) % 2);
   }
 
   tile(x, y) {
     const key = x * 100003 + y;
     let t = this.cache.get(key);
     if (t === undefined) {
-      const tr = this.tree(x, y);
-      t = tr ? (y === tr.ay ? T.TREE_TOP : T.TREE_BOT) : this.base(x, y);
+      const ax = this.colOf(x);
+      if (this.treeAt(ax, y - 1)) t = T.TREE_BOT;       // tronc d'un sapin qui démarre au-dessus
+      else if (this.treeAt(ax, y)) t = T.TREE_TOP;      // haut d'un sapin
+      else t = this.base(x, y);
       if (this.cache.size > 200000) { this.cache.clear(); this.anchors.clear(); }
       this.cache.set(key, t);
     }

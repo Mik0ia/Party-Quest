@@ -190,17 +190,11 @@ export class Game {
       }
     }
 
-    // 2. Arbres visibles (2x2 tuiles) + leur ombre au sol
+    // 2. Sapins visibles (2x2 tuiles, un par colonne paire et par ligne de départ)
     const trees = [];
-    const seen = new Set();
-    for (let ty = y0; ty <= y1 + 1; ty++) {
-      for (let tx = x0 - 1; tx <= x1; tx++) {
-        const tr = W.tree(tx, ty);
-        if (!tr) continue;
-        const k = tr.ax * 100003 + tr.ay;
-        if (seen.has(k)) continue;
-        seen.add(k);
-        trees.push(tr);
+    for (let ay = y0 - 1; ay <= y1; ay++) {
+      for (let ax = W.colOf(x0 - 1); ax <= x1; ax += 2) {
+        if (W.treeAt(ax, ay)) trees.push({ ax, ay });
       }
     }
     // 3. Arbres et personnages triés par leur base : on passe derrière les feuillages
@@ -264,11 +258,57 @@ export class Game {
     corner(sdir && w, false, true); corner(sdir && e, true, true);
   }
 
+  // L'eau est en contrebas : talus de terre visible sur la berge nord (face à la caméra),
+  // talus plus fin sur les côtés, simple rebord d'herbe au sud, ombre portée sur l'eau.
   drawShore(g, tx, ty, sx, sy) {
     const land = (x, y) => !isWater(this.world.tile(x, y));
-    const sides = [land(tx, ty - 1), land(tx, ty + 1), land(tx - 1, ty), land(tx + 1, ty)];
-    if (!sides.some(Boolean)) return;
-    this.edgeBand(g, sx, sy, sides, [C.water[0], C.water[3], C.water[2]], C.grass[2]);
+    const n = land(tx, ty - 1), s = land(tx, ty + 1), w = land(tx - 1, ty), e = land(tx + 1, ty);
+    const nw = land(tx - 1, ty - 1), ne = land(tx + 1, ty - 1);
+    if (!(n || s || w || e || nw || ne)) return;
+    const [dk, md, lt, hi] = C.bank;
+    const shadow = C.water[1];
+    const p = (x, y, col) => { g.fillStyle = col; g.fillRect(sx + x, sy + y, 1, 1); };
+    const face = (x, y, h) => {
+      // colonne de talus : stries verticales claires/sombres, base plus sombre
+      for (let i = 0; i < h; i++) {
+        const k = (x + tx * 16) & 3;
+        p(x, y + i, i === 0 ? hi : i === h - 1 ? dk : k === 0 ? md : k === 2 ? hi : lt);
+      }
+    };
+    const FACE = 6;
+
+    if (n) {
+      for (let x = 0; x < 16; x++) {
+        p(x, 0, C.grass[1]);
+        face(x, 1, FACE);
+        p(x, FACE + 1, shadow);
+        if ((x + tx) & 1) p(x, FACE + 2, shadow);
+      }
+    }
+    const top = n ? FACE + 1 : 0;
+    if (w) {
+      for (let y = top; y < 16; y++) {
+        p(0, y, C.grass[1]); p(1, y, md); p(2, y, dk); p(3, y, shadow);
+      }
+    }
+    if (e) {
+      for (let y = top; y < 16; y++) {
+        p(15, y, C.grass[1]); p(14, y, lt); p(13, y, dk);
+      }
+    }
+    if (s) {
+      for (let x = 0; x < 16; x++) {
+        p(x, 15, C.grass[1]); p(x, 14, dk); if ((x + tx) & 1) p(x, 13, C.water[3]);
+      }
+    }
+    // Coins extérieurs : la berge nord continue en diagonale
+    if (!n && !w && nw) for (let x = 0; x < 3; x++) { face(x, 0, FACE - x); p(x, FACE - x, shadow); }
+    if (!n && !e && ne) for (let x = 13; x < 16; x++) { face(x, 0, FACE - (15 - x)); }
+    // Coins intérieurs arrondis (herbe qui mord sur l'eau)
+    if (n && w) { p(0, 1, C.grass[1]); p(1, 1, C.grass[1]); p(0, 2, C.grass[1]); }
+    if (n && e) { p(15, 1, C.grass[1]); p(14, 1, C.grass[1]); p(15, 2, C.grass[1]); }
+    if (s && w) { p(0, 14, C.grass[1]); p(1, 14, C.grass[1]); p(0, 13, C.grass[1]); }
+    if (s && e) { p(15, 14, C.grass[1]); p(14, 14, C.grass[1]); p(15, 13, C.grass[1]); }
   }
 
   drawPathEdge(g, tx, ty, sx, sy) {
