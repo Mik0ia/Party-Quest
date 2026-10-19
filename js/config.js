@@ -1,14 +1,13 @@
 // Config Firebase du projet party-quest-game
 // (Console Firebase > Paramètres du projet > Vos applications > App Web).
-// ⚠️ apiKey, messagingSenderId et appId sont encore des valeurs d'exemple :
-// tant que apiKey commence par "VOTRE", le jeu tourne en mode démo (solo + 2 bots).
+// Ces clés web sont publiques par conception : la sécurité repose sur database.rules.json.
 export const firebaseConfig = {
-  apiKey: 'VOTRE_CLÉ_API',
+  apiKey: 'AIzaSyA0VnyLo_csqjPy-xXzo-1gzVeFcw2VVFc',
   authDomain: 'party-quest-game.firebaseapp.com',
+  // URL de la Realtime Database (visible en haut de l'onglet Données dans la console)
   databaseURL: 'https://party-quest-game-default-rtdb.europe-west1.firebasedatabase.app',
   projectId: 'party-quest-game',
-  storageBucket: 'party-quest-game.appspot.com',
-  messagingSenderId: 'VOTRE_SENDER_ID',
-  appId: 'VOTRE_APP_ID',
-  measurementId: 'VOTRE_MEASUREMENT_ID',
+  storageBucket: 'party-quest-game.firebasestorage.app',
+  messagingSenderId: '524626600419',
+  appId: '1:524626600419:web:ca1dd1c3455a0fbabd80d6',
 };
