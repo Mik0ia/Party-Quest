@@ -189,7 +189,11 @@ export class Game {
       for (let tx = x0; tx <= x1; tx++) {
         const t = W.tile(tx, ty);
         const sx = tx * TS - cx, sy = ty * TS - cy;
-        g.drawImage(this.tiles.get(t, wf, tx, ty), sx, sy);
+        if (isFace(t)) {
+          // paroi : rebord seulement en haut d'une falaise, pied seulement en bas
+          const top = !isFace(W.tile(tx, ty - 1)), bottom = !isFace(W.tile(tx, ty + 1));
+          g.drawImage(this.tiles.face(cliffLevel(t), tx, top, bottom), sx, sy);
+        } else g.drawImage(this.tiles.get(t, wf, tx, ty), sx, sy);
         if (isWater(t)) this.drawShore(g, tx, ty, sx, sy);
         else if (t === T.PATH) this.drawPathEdge(g, tx, ty, sx, sy);
         if (isCliff(t)) this.drawCliffEdges(g, t, tx, ty, sx, sy);
@@ -327,11 +331,33 @@ export class Game {
     const lvl = cliffLevel(t);
     const face = isFace(t);
     const h = (x, y) => cliffLevel(W.tile(x, y));
-    if (!face && h(tx, ty - 1) < lvl) g.drawImage(this.tiles.cliffRim(lvl), sx, sy);
-    if (h(tx - 1, ty) < lvl) g.drawImage(this.tiles.cliffSide(lvl, false), sx, sy);
-    if (h(tx + 1, ty) < lvl) g.drawImage(this.tiles.cliffSide(lvl, true), sx + 11, sy);
-    if (!face && h(tx, ty - 1) >= lvl && h(tx - 1, ty) >= lvl && h(tx + 1, ty) >= lvl
-        && ((tx * 73856093) ^ (ty * 19349663)) % 13 === 0) {
+    const p = (x, y, w, hh, col) => { g.fillStyle = col; g.fillRect(sx + x, sy + y, w, hh); };
+    const ramp = C.cliffFace[lvl - 1];
+    const lowW = h(tx - 1, ty) < lvl, lowE = h(tx + 1, ty) < lvl;
+
+    if (face) {
+      // Bords de paroi : arête bien dessinée et coin assombri (dégradé vers le contour)
+      if (lowW) { p(0, 0, 1, 16, C.outline); p(1, 0, 1, 16, ramp[0]); p(2, 0, 1, 16, ramp[1]); }
+      if (lowE) { p(15, 0, 1, 16, C.outline); p(14, 0, 1, 16, ramp[0]); p(13, 0, 1, 16, ramp[1]); }
+      // Coin : paroi qui continue sous un voisin plus bas → joint sombre en diagonale
+      const topEdge = !isFace(W.tile(tx, ty - 1));
+      if (topEdge && lowW) { p(0, 0, 3, 3, C.outline); p(3, 1, 1, 2, ramp[0]); }
+      if (topEdge && lowE) { p(13, 0, 3, 3, C.outline); p(12, 1, 1, 2, ramp[0]); }
+      return;
+    }
+
+    const lowN = h(tx, ty - 1) < lvl;
+    if (lowN) g.drawImage(this.tiles.cliffRim(lvl), sx, sy);
+    if (lowW) g.drawImage(this.tiles.cliffSide(lvl, false), sx, sy);
+    if (lowE) g.drawImage(this.tiles.cliffSide(lvl, true), sx + 11, sy);
+    // Coins du plateau assombris pour bien marquer l'angle
+    if (lowN && lowW) { p(0, 0, 4, 2, C.outline); p(0, 0, 2, 5, C.outline); p(2, 2, 2, 2, ramp[0]); }
+    if (lowN && lowE) { p(12, 0, 4, 2, C.outline); p(14, 0, 2, 5, C.outline); p(12, 2, 2, 2, ramp[0]); }
+    // Angle rentrant : un voisin en diagonale plus bas alors que les côtés sont au même niveau
+    if (!lowN && !lowW && h(tx - 1, ty - 1) < lvl) { p(0, 0, 3, 3, ramp[0]); p(0, 0, 2, 2, C.outline); }
+    if (!lowN && !lowE && h(tx + 1, ty - 1) < lvl) { p(13, 0, 3, 3, ramp[0]); p(14, 0, 2, 2, C.outline); }
+    // Pied d'une paroi située juste en dessous : la tuile de plateau du dessus garde son bord
+    if (!lowN && !lowW && !lowE && ((tx * 73856093) ^ (ty * 19349663)) % 13 === 0) {
       g.drawImage(this.tiles.boulder(lvl), sx, sy);
     }
   }

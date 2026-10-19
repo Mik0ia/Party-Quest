@@ -459,35 +459,42 @@ function lumps(m, list, levels) {
   for (const [cx, cy, rx, ry] of list) blob(m, cx, cy, rx, ry, levels, 0.1);
 }
 
-function cliffFace(level, variant) {
+// Paroi en colonnes de roche. top = rebord du plateau visible en haut (début de paroi),
+// bottom = pied de paroi en bas. Sans eux, la tuile se raccorde sans couture avec la
+// paroi du dessus / du dessous : deux parois empilées forment une seule grande falaise.
+function cliffFace(level, variant, top, bottom) {
   const ramp = C.cliffFace[level - 1];
   const lip = C.cliffTop[level - 1];
   const c = canvas(16, 16);
   const g = c.getContext('2d');
-  g.fillStyle = ramp[0];
-  g.fillRect(0, 0, 16, 16);
-  const m = makeMask(16, 16);
-  // colonnes de roche bombées et verticales (comme les parois GBA), qui bouclent sur 16 px
   const o = variant ? 3 : 0;
-  const cols = [[4 + o, 9.5, 4.4, 7.4, 0.15], [12 + o, 9, 4.2, 7.8, 0]];
-  for (const [cx, cy, rx, ry, bias] of cols) {
-    for (const k of [-16, 0, 16]) blob(m, cx + k, cy, rx, ry, 4, bias);
+  const y0 = top ? 3 : 0;
+  for (let y = 0; y < 16; y++) {
+    for (let x = 0; x < 16; x++) {
+      // position dans la colonne (2 colonnes de 8 px séparées par une fente sombre)
+      const lx = (x - o + 16) & 7;
+      if (lx === 0) { px(g, x, y, ramp[0]); continue; }
+      const dx = (lx - 4) / 3.6;                       // -1 bord gauche → 1 bord droit
+      let l = -0.55 * dx + 0.62 * Math.sqrt(Math.max(0, 1 - dx * dx)) + 0.1;
+      // arrondi du haut de colonne seulement au début de la paroi, ombre au pied
+      if (top && y < y0 + 2) l += (y - y0 - 2) * 0.25;
+      if (bottom && y > 11) l -= (y - 11) * 0.22;
+      // fissures horizontales décalées par colonne (même motif d'une tuile à l'autre)
+      const col = ((x - o + 16) >> 3) & 1;
+      if (y === (col ? 5 : 11) && lx > 1 && lx < 6) l = -1;
+      l += dither(x, y) * 0.5;
+      px(g, x, y, ramp[clamp(Math.floor(l * 3.2) + 1, 0, 4)]);
+    }
   }
-  // fentes verticales sombres entre les colonnes
-  for (const gx of [o & 15, (8 + o) & 15]) for (let y = 3; y < 16; y++) m.v[y * 16 + gx] = -1;
-  // petites fissures horizontales pour casser les colonnes
-  for (const [x, y] of [[2 + o, 7], [11 + o, 11]]) {
-    for (let i = 0; i < 3; i++) { const xx = (x + i) & 15; if (m.v[y * 16 + xx] > 0) m.v[y * 16 + xx] = 0; }
+  if (top) {
+    // rebord du plateau au-dessus : arête claire puis contour
+    for (let x = 0; x < 16; x++) {
+      px(g, x, 0, lip[3]);
+      px(g, x, 1, (x + variant) % 4 === 0 ? lip[1] : lip[2]);
+      px(g, x, 2, C.outline);
+    }
   }
-  drawMask(g, m, ramp.slice(0, 4), null);
-  // rebord du plateau au-dessus : arête claire puis contour
-  for (let x = 0; x < 16; x++) {
-    px(g, x, 0, lip[3]);
-    px(g, x, 1, (x + variant) % 4 === 0 ? lip[1] : lip[2]);
-    px(g, x, 2, C.outline);
-  }
-  // pied de paroi dans l'ombre
-  for (let x = 0; x < 16; x++) px(g, x, 15, C.outline);
+  if (bottom) for (let x = 0; x < 16; x++) { px(g, x, 14, ramp[0]); px(g, x, 15, C.outline); }
   return c;
 }
 
@@ -550,8 +557,14 @@ export function buildTiles() {
     [T.TENT_TOP]: g0,
     [T.TENT_BOT]: g1,
     [T.TOP1]: cliffTop(1), [T.TOP2]: cliffTop(2), [T.TOP3]: cliffTop(3),
+    [T.FACE1]: cliffFace(1, 0, true, true), [T.FACE2]: cliffFace(2, 0, true, true), [T.FACE3]: cliffFace(3, 0, true, true),
   };
-  const faces = [1, 2, 3].map((l) => [cliffFace(l, 0), cliffFace(l, 1)]);
+  const faceCache = new Map();
+  const face = (l, v, top, bot) => {
+    const k = `${l}${v}${+top}${+bot}`;
+    if (!faceCache.has(k)) faceCache.set(k, cliffFace(l, v, top, bot));
+    return faceCache.get(k);
+  };
   const sides = [1, 2, 3].map((l) => [cliffSide(l, false), cliffSide(l, true)]);
   const rims = [1, 2, 3].map((l) => cliffRim(l));
   const boulders = [1, 2, 3].map((l) => boulderOverlay(l));
@@ -561,13 +574,13 @@ export function buildTiles() {
   return {
     get(type, frame, x = 0, y = 0) {
       if (type === T.FLOWERS && ((x * 7 + y * 3) & 3) === 0) return orange;
-      if (type >= T.FACE1 && type <= T.FACE3) return faces[type - T.FACE1][x & 1];
       return fixed[type] || frames[frame & 3][type];
     },
     tree() { return pine; },
     tent(kind) { return tents[kind]; },
     cliffSide(level, right) { return sides[level - 1][right ? 1 : 0]; },
     cliffRim(level) { return rims[level - 1]; },
+    face(level, x, top, bottom) { return face(level, x & 1, top, bottom); },
     boulder(level) { return boulders[level - 1]; },
   };
 }
