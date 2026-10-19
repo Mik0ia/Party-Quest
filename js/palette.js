@@ -27,16 +27,16 @@ export const C = {
   // Décor médiéval
   canvas: ['#B8A07C', '#E0CCA4', '#F8ECCC'],                        // toile de tente
   wood: ['#4A2C1C', '#7A4C2C', '#A8703C', '#D09A5C'],
-  // Falaises : dessus de plateau par couche (de plus en plus clair en montant) et parois
+  // Falaises : sol rocheux du plateau par couche (de plus en plus clair en montant) et parois
   cliffTop: [
-    ['#5E3A34', '#86584C', '#A47262', '#C0907A'],
-    ['#6C4440', '#94665A', '#B48272', '#D0A28C'],
-    ['#7A5048', '#A47466', '#C2927E', '#DEB49C'],
+    ['#5E4440', '#7E625A', '#9A7E72', '#B89C8E'],
+    ['#6A4E48', '#8A6E64', '#A88A7E', '#C6AA9A'],
+    ['#765850', '#987A6E', '#B6988A', '#D4B8A8'],
   ],
   cliffFace: [
-    ['#24140F', '#422A20', '#5E3E2E', '#7A543E'],
-    ['#2A1812', '#4A3026', '#684634', '#865E46'],
-    ['#301C16', '#52362A', '#724E3A', '#90684E'],
+    ['#24181A', '#4A3432', '#6A4E48', '#8C6E62', '#AE8E80'],
+    ['#2A1C1C', '#523A36', '#74564E', '#967668', '#B89888'],
+    ['#30201E', '#5A403A', '#7E5E54', '#A07E70', '#C2A090'],
   ],
   eye: '#283048',
 };

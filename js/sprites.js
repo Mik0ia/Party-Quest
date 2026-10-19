@@ -434,49 +434,100 @@ function tent(kind) {
 }
 
 /* ───────────────────────── FALAISES ─────────────────────────
-   Dessus de plateau en pavés de pierre décalés (motif 8x4 qui boucle sur 16 px),
-   paroi en strates verticales qui s'assombrit vers le pied. Chaque couche est un
-   peu plus claire que celle du dessous pour lire la hauteur. */
+   Inspiré des montagnes des RPG GBA : le dessus d'un plateau est un sol rocheux lisse
+   (stries diagonales, petits cailloux) ; les bords sont des rebords de pierres arrondies ;
+   la paroi est faite de gros blocs bombés et ombrés, séparés par des fissures sombres. */
 
 function cliffTop(level) {
   const [dk, md, lt, hi] = C.cliffTop[level - 1];
   return tile((g) => {
-    for (let y = 0; y < 16; y++) {
-      for (let x = 0; x < 16; x++) {
-        // galets arrondis de 8x8 en quinconce (le motif boucle sur 16 px)
-        const off = ((y >> 3) & 1) * 4;
-        const lx = (x + off) & 7, ly = y & 7;
-        const dx = lx - 3, dy = ly - 3;
-        let col;
-        if (lx === 7 || ly === 7 || (Math.abs(dx) >= 3 && Math.abs(dy) >= 3)) col = dk;
-        else {
-          const l = -(dx + dy) / 6 + dither(x, y) * 0.5;
-          col = l > 0.35 ? hi : l > -0.25 ? lt : md;
-        }
-        px(g, x, y, col);
-      }
+    g.fillStyle = lt;
+    g.fillRect(0, 0, 16, 16);
+    // stries diagonales courtes
+    for (const [x, y] of [[1, 2], [9, 1], [5, 6], [13, 7], [2, 11], [10, 12], [6, 14]]) {
+      px(g, x, y + 1, md); px(g, x + 1, y, md); px(g, (x + 2) & 15, (y + 2) & 15, hi);
+    }
+    // petits cailloux
+    for (const [x, y] of [[12, 3], [3, 8], [14, 13]]) {
+      px(g, x, y, hi); px(g, x + 1, y, md); px(g, x, y + 1, md); px(g, x + 1, y + 1, dk);
     }
   });
 }
 
-function cliffFace(level) {
-  const [dk, md, lt, hi] = C.cliffFace[level - 1];
+// Bloc de pierre bombé (masque ombré) dans une tuile, avec contour sombre
+function lumps(m, list, levels) {
+  for (const [cx, cy, rx, ry] of list) blob(m, cx, cy, rx, ry, levels, 0.1);
+}
+
+function cliffFace(level, variant) {
+  const ramp = C.cliffFace[level - 1];
   const lip = C.cliffTop[level - 1];
-  return tile((g) => {
-    for (let x = 0; x < 16; x++) {
-      // rebord du plateau, puis arête sombre
-      px(g, x, 0, lip[3]); px(g, x, 1, lip[2]); px(g, x, 2, C.outline);
-      for (let y = 3; y < 15; y++) {
-        const t = (y - 3) / 12;
-        const k = (x + (y > 8 ? 2 : 0)) % 5;           // strates verticales décalées à mi-hauteur
-        let col = k === 0 ? dk : k === 1 ? hi : t < 0.4 ? lt : md;
-        if (y === 8 && (x & 1)) col = dk;              // petite corniche
-        if (t > 0.8 && k !== 1) col = dk;              // pied de falaise dans l'ombre
-        px(g, x, y, col);
-      }
-      px(g, x, 15, C.outline);
-    }
-  });
+  const c = canvas(16, 16);
+  const g = c.getContext('2d');
+  g.fillStyle = ramp[0];
+  g.fillRect(0, 0, 16, 16);
+  const m = makeMask(16, 16);
+  // colonnes de roche bombées et verticales (comme les parois GBA), qui bouclent sur 16 px
+  const o = variant ? 3 : 0;
+  const cols = [[4 + o, 9.5, 4.4, 7.4, 0.15], [12 + o, 9, 4.2, 7.8, 0]];
+  for (const [cx, cy, rx, ry, bias] of cols) {
+    for (const k of [-16, 0, 16]) blob(m, cx + k, cy, rx, ry, 4, bias);
+  }
+  // fentes verticales sombres entre les colonnes
+  for (const gx of [o & 15, (8 + o) & 15]) for (let y = 3; y < 16; y++) m.v[y * 16 + gx] = -1;
+  // petites fissures horizontales pour casser les colonnes
+  for (const [x, y] of [[2 + o, 7], [11 + o, 11]]) {
+    for (let i = 0; i < 3; i++) { const xx = (x + i) & 15; if (m.v[y * 16 + xx] > 0) m.v[y * 16 + xx] = 0; }
+  }
+  drawMask(g, m, ramp.slice(0, 4), null);
+  // rebord du plateau au-dessus : arête claire puis contour
+  for (let x = 0; x < 16; x++) {
+    px(g, x, 0, lip[3]);
+    px(g, x, 1, (x + variant) % 4 === 0 ? lip[1] : lip[2]);
+    px(g, x, 2, C.outline);
+  }
+  // pied de paroi dans l'ombre
+  for (let x = 0; x < 16; x++) px(g, x, 15, C.outline);
+  return c;
+}
+
+// Rebord latéral d'un plateau (bande de 5 px de pierres arrondies), gauche ou droite
+function cliffSide(level, right) {
+  const ramp = C.cliffFace[level - 1];
+  const c = canvas(5, 16);
+  const g = c.getContext('2d');
+  const m = makeMask(5, 16);
+  const cx = right ? 2.2 : 2.8;
+  lumps(m, [[cx, 2, 2.6, 3.2], [cx, 8, 2.6, 3.4], [cx, 14, 2.6, 3.2]], 4);
+  drawMask(g, m, ramp.slice(1), ramp[0]);
+  for (let y = 0; y < 16; y++) px(g, right ? 4 : 0, y, C.outline);
+  return c;
+}
+
+// Rebord haut d'un plateau : rangée de pierres arrondies (7 px), le relief se lit
+// aussi quand la falaise descend vers le nord
+function cliffRim(level) {
+  const ramp = C.cliffFace[level - 1];
+  const c = canvas(16, 7);
+  const g = c.getContext('2d');
+  const m = makeMask(16, 7);
+  for (const cx of [2.5, 8.5, 14.5]) for (const k of [-16, 0, 16]) blob(m, cx + k, 3.6, 3.3, 3.2, 4, 0.1);
+  drawMask(g, m, ramp.slice(1), ramp[0]);
+  for (let x = 0; x < 16; x++) { px(g, x, 0, C.outline); px(g, x, 6, ramp[0]); }
+  return c;
+}
+
+// Rocher posé sur un plateau (décor)
+function boulderOverlay(level) {
+  const ramp = C.cliffFace[level - 1];
+  const c = canvas(16, 16);
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(30, 15, 10, 0.3)';
+  g.fillRect(3, 13, 11, 2);
+  const m = makeMask(16, 15);
+  blob(m, 7, 9.5, 5, 4.6, 4); blob(m, 10.5, 11, 3.4, 3, 4, -0.1);
+  drawMask(g, m, ramp.slice(1), C.outline);
+  return c;
 }
 
 /* ───────────────────────── API ───────────────────────── */
@@ -499,18 +550,25 @@ export function buildTiles() {
     [T.TENT_TOP]: g0,
     [T.TENT_BOT]: g1,
     [T.TOP1]: cliffTop(1), [T.TOP2]: cliffTop(2), [T.TOP3]: cliffTop(3),
-    [T.FACE1]: cliffFace(1), [T.FACE2]: cliffFace(2), [T.FACE3]: cliffFace(3),
   };
+  const faces = [1, 2, 3].map((l) => [cliffFace(l, 0), cliffFace(l, 1)]);
+  const sides = [1, 2, 3].map((l) => [cliffSide(l, false), cliffSide(l, true)]);
+  const rims = [1, 2, 3].map((l) => cliffRim(l));
+  const boulders = [1, 2, 3].map((l) => boulderOverlay(l));
   const tents = { 1: tent(1), 2: tent(2) };
   const orange = flowers(C.flowerOrange);
   const pine = pineTree();
   return {
     get(type, frame, x = 0, y = 0) {
       if (type === T.FLOWERS && ((x * 7 + y * 3) & 3) === 0) return orange;
+      if (type >= T.FACE1 && type <= T.FACE3) return faces[type - T.FACE1][x & 1];
       return fixed[type] || frames[frame & 3][type];
     },
     tree() { return pine; },
     tent(kind) { return tents[kind]; },
+    cliffSide(level, right) { return sides[level - 1][right ? 1 : 0]; },
+    cliffRim(level) { return rims[level - 1]; },
+    boulder(level) { return boulders[level - 1]; },
   };
 }
 

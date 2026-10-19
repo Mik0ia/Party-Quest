@@ -320,24 +320,19 @@ export class Game {
     if (s && e) { p(15, 14, C.grass[1]); p(14, 14, C.grass[1]); p(15, 13, C.grass[1]); }
   }
 
-  // Contours des formations rocheuses : bords latéraux, rebord supérieur, angles de paroi
+  // Rebords des formations rocheuses (style GBA) : pierres arrondies sur les côtés et en haut
+  // de chaque plateau, quelques rochers posés dessus.
   drawCliffEdges(g, t, tx, ty, sx, sy) {
     const W = this.world;
     const lvl = cliffLevel(t);
     const face = isFace(t);
-    const p = (x, y, col) => { g.fillStyle = col; g.fillRect(sx + x, sy + y, 1, 1); };
-    // Hauteur "visuelle" d'un voisin : une paroi compte pour la couche qu'elle soutient
     const h = (x, y) => cliffLevel(W.tile(x, y));
-    const sideDk = C.cliffFace[lvl - 1][1];
-    for (const [dx, col0, col1] of [[-1, 0, 1], [1, 15, 14]]) {
-      const nt = W.tile(tx + dx, ty);
-      const lower = h(tx + dx, ty) < lvl || (face && !isFace(nt) && cliffLevel(nt) <= lvl && isCliff(nt) === false);
-      if (!lower) continue;
-      for (let y = face ? 0 : 0; y < 16; y++) { p(col0, y, C.outline); p(col1, y, sideDk); }
-    }
-    if (!face && h(tx, ty - 1) < lvl) {
-      const hi = C.cliffTop[lvl - 1][3];
-      for (let x = 0; x < 16; x++) { p(x, 0, C.outline); p(x, 1, hi); }
+    if (!face && h(tx, ty - 1) < lvl) g.drawImage(this.tiles.cliffRim(lvl), sx, sy);
+    if (h(tx - 1, ty) < lvl) g.drawImage(this.tiles.cliffSide(lvl, false), sx, sy);
+    if (h(tx + 1, ty) < lvl) g.drawImage(this.tiles.cliffSide(lvl, true), sx + 11, sy);
+    if (!face && h(tx, ty - 1) >= lvl && h(tx - 1, ty) >= lvl && h(tx + 1, ty) >= lvl
+        && ((tx * 73856093) ^ (ty * 19349663)) % 13 === 0) {
+      g.drawImage(this.tiles.boulder(lvl), sx, sy);
     }
   }
 

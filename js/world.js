@@ -18,8 +18,8 @@ export const T = {
 };
 
 // Seuils de hauteur du bruit de Perlin (valeurs de -0.7 à 0.7 environ) :
-//   < -0.24 eau profonde · < -0.12 eau · sol · > 0.19 roche · > 0.26 2e couche · > 0.33 3e couche
-export const ELEV = { DEEP: -0.24, WATER: -0.12, ROCK: [0.19, 0.26, 0.33] };
+//   < -0.30 eau profonde · < -0.18 eau · sol · > 0.25 roche · > 0.32 2e couche · > 0.39 3e couche
+export const ELEV = { DEEP: -0.30, WATER: -0.18, ROCK: [0.25, 0.32, 0.39] };
 
 const BLOCKING = new Set([
   T.DEEP, T.WATER, T.BUSH, T.ROCK, T.TREE_BOT, T.SIGN, T.BARREL, T.TENT_BOT,
