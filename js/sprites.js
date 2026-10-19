@@ -1,9 +1,9 @@
 import { C, PLAYER_COLORS } from './palette.js';
-import { T, TREE_ROUND, TREE_PINE } from './world.js';
+import { T } from './world.js';
 
-// Pixel art 16-bit généré en code : tuiles 16x16, arbres 32x32, personnages 16x32.
-// Les volumes (buissons, feuillages) sont ombrés à partir d'une lumière venant d'en haut à gauche,
-// quantifiés sur une palette courte avec une trame de Bayer, puis détourés : le rendu typique GBA.
+// Tileset original façon GBA, entièrement généré en code :
+// tuiles 16x16, sapins 32x32, personnages 16x32 (hitbox d'une case, visuel sur deux).
+// Volumes ombrés avec une lumière venant d'en haut à gauche, trame de Bayer, contours colorés.
 
 function canvas(w, h) {
   const c = document.createElement('canvas');
@@ -17,137 +17,121 @@ function px(g, x, y, col) {
 }
 
 const BAYER = [[0, 2], [3, 1]];
-const LIGHT = (() => { const l = [-0.55, -0.7, 0.45]; const n = Math.hypot(...l); return l.map((v) => v / n); })();
+const dither = (x, y) => (BAYER[y & 1][x & 1] - 1.5) / 4; // [-0.375, 0.375]
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
-/* Volumes ombrés : union de disques, chaque pixel prend la teinte de la sphère qui le recouvre.
-   ramp = [contour sombre, ..., reflet] ; renvoie une grille d'indices (-1 = vide). */
-function shadeBlobs(w, h, blobs, levels) {
-  const owner = new Int8Array(w * h).fill(-1);
-  const shade = new Int8Array(w * h).fill(-1);
+/* Masque générique : grille d'indices de teinte (-1 = vide),
+   dessinée ensuite avec une rampe et un contour automatique. */
+function makeMask(w, h) {
+  return { w, h, v: new Int8Array(w * h).fill(-1) };
+}
+function drawMask(g, m, ramp, outline, ox = 0, oy = 0) {
+  const { w, h, v } = m;
+  const at = (x, y) => (x >= 0 && y >= 0 && x < w && y < h ? v[y * w + x] : -1);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      for (let i = blobs.length - 1; i >= 0; i--) {
-        const [cx, cy, r] = blobs[i];
-        const dx = (x + 0.5 - cx) / r, dy = (y + 0.5 - cy) / r;
-        const d2 = dx * dx + dy * dy;
-        if (d2 > 1) continue;
-        const nz = Math.sqrt(1 - d2);
-        let l = dx * LIGHT[0] + dy * LIGHT[1] + nz * LIGHT[2];
-        l = Math.max(0, Math.min(0.999, l * 0.9 + 0.12));
-        const v = l * levels + (BAYER[y & 1][x & 1] - 1.5) * 0.28;
-        owner[y * w + x] = i;
-        shade[y * w + x] = Math.max(0, Math.min(levels - 1, Math.floor(v)));
-        break;
+      const s = v[y * w + x];
+      if (s >= 0) { px(g, ox + x, oy + y, ramp[s]); continue; }
+      if (outline && (at(x - 1, y) >= 0 || at(x + 1, y) >= 0 || at(x, y - 1) >= 0 || at(x, y + 1) >= 0)) {
+        px(g, ox + x, oy + y, outline);
       }
     }
   }
-  // Ombre portée d'une touffe sur celle de derrière (donne le relief des feuillages)
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const o = owner[y * w + x];
-      if (o < 0) continue;
-      const below = y + 1 < h ? owner[(y + 1) * w + x] : -1;
-      const right = x + 1 < w ? owner[y * w + x + 1] : -1;
-      if ((below > o) || (right > o && (x + y) & 1)) shade[y * w + x] = 0;
-    }
-  }
-  return { owner, shade };
 }
 
-function drawShaded(g, ox, oy, w, h, res, ramp, outline) {
-  const { owner, shade } = res;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const i = y * w + x;
-      if (owner[i] >= 0) { px(g, ox + x, oy + y, ramp[shade[i] + 1]); continue; }
-      // Contour : pixel vide qui touche le volume
-      const n = (xx, yy) => xx >= 0 && yy >= 0 && xx < w && yy < h && owner[yy * w + xx] >= 0;
-      if (n(x - 1, y) || n(x + 1, y) || n(x, y - 1) || n(x, y + 1)) px(g, ox + x, oy + y, outline);
+// Sphère/ellipse ombrée (buissons, rochers)
+function blob(m, cx, cy, rx, ry, levels, bias = 0) {
+  for (let y = 0; y < m.h; y++) {
+    for (let x = 0; x < m.w; x++) {
+      const dx = (x + 0.5 - cx) / rx, dy = (y + 0.5 - cy) / ry;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > 1) continue;
+      const nz = Math.sqrt(1 - d2);
+      const l = -0.5 * dx - 0.65 * dy + 0.6 * nz + bias;
+      m.v[y * m.w + x] = clamp(Math.floor((l * 0.85 + 0.25) * levels + dither(x, y)), 0, levels - 1);
     }
   }
 }
 
 /* ───────────────────────── PERSONNAGES (16x32) ─────────────────────────
-   Lettres : O contour · 1-4 dégradé du joueur (sombre → clair) · S/s/h peau
-   E yeux · W blanc · P/p pantalon · B/b bottes · L ceinture (cuir).
-   Les vues de face et de dos sont décrites sur une demi-largeur puis symétrisées. */
+   Héros original : cheveux bruns en épis, bandeau et veste aux couleurs du joueur,
+   t-shirt blanc, pantalon sombre. Lettres :
+   O contour · 1-4 dégradé joueur · a b c d cheveux · S s h peau · E yeux
+   W w t-shirt · P p q pantalon · B k chaussures */
 
 const half = (rows) => rows.map((r) => r + [...r].reverse().join(''));
 
-const HEAD_DOWN = half([
-  '......OO', '....OO34', '...O3444', '..O34444', '.O234444', '.O233333',
-  'O2233O33', 'O2O3S3SS', 'O2OSSSSS', 'O1OSWESS', 'O1OSWESS', '.OOhSSSS',
-  '..OsSSSS', '...OOsss',
+const FRONT_HEAD = half([
+  '.....O.O', '....OcOd', '...Ocdcd', '..Obccdc', '..O44444', '.Ob33333',
+  '.ObaS3SS', '.OaSSSSS', '.OaSESSS', '.OaSEhSS', '..OsSSSS', '...OOsss',
 ]);
-const HEAD_UP = half([
-  '......OO', '....OO34', '...O3444', '..O34444', '.O234444', '.O233333',
-  'O2233333', 'O2223333', 'O1222333', 'O1122233', 'O1112222', '.O111122',
-  '..OO1111', '...OOsss',
+const BACK_HEAD = half([
+  '.....O.O', '....OcOd', '...Ocdcd', '..Obccdc', '..O44444', '.Ob33333',
+  '.Obbcccc', '.Oabbccc', '.Oaabbcc', '.Oaaabbb', '..Oaaabb', '...OOsss',
 ]);
-const BODY_DOWN = half([
-  '..OO44OS', '.O3O4433', '.O3O3343', '.O2O3333', '.OSO2333', '..OOLLLL',
+const FRONT_BODY = half([
+  '...OO3Ww', '..O432WW', '.O3O32WW', '.O3O22Ww', '.OSO2222', '..OOPPPP',
 ]);
-const BODY_UP = half([
-  '..OO33OS', '.O3O3333', '.O3O3333', '.O2O2333', '.OSO2223', '..OOLLLL',
+const BACK_BODY = half([
+  '...OO333', '..O43333', '.O3O3333', '.O3O3222', '.OSO2222', '..OOPPPP',
 ]);
-const LEGS_FRONT = half([
-  '...OPPPP', '...OPPpO', '...OPPpO', '...OBBbO', '...OBBbO', '...OOOOO',
-]);
+const FRONT_LEGS = half(['...OqPPp', '...OPPpO', '...OBBkO', '...OOOOO']);
 
-const HEAD_SIDE = [
-  '......OOOO......',
-  '....OO3444OO....',
-  '...O34444443O...',
-  '..O3344444443O..',
-  '..O33344444333O.',
-  '.O333333333332O.',
-  '.O3O3S33333322O.',
-  '.OSSSSO3332221O.',
-  '.OSWESSO322221O.',
-  'OhSWESSSO22211O.',
-  '.OSSSSSSO1111O..',
-  '..OhSSSSO111O...',
-  '...OOsSSsOOO....',
-  '.....OOssO......',
+const SIDE_HEAD = [
+  '......O.O.......',
+  '.....OcOdO......',
+  '....OcdcdcO.....',
+  '...ObccdcdcO....',
+  '..O4444444cO....',
+  '..O33333334bO...',
+  '.OS3SSSSbb43bO..',
+  '.OSSSSSSabbbbO..',
+  'OSESSSSSaabbaO..',
+  '.OEhSSSsSaaaO...',
+  '..OsSSSsOaaO....',
+  '...OOssOOOO.....',
 ];
-const BODY_SIDE = [
-  '....O443333O....',
-  '....O43O3333O...',
-  '....O33O3332O...',
-  '....O33O3322O...',
-  '....OSSO3222O...',
-  '....OOOLLLLLO...',
+const SIDE_BODY = [
+  '....O3WW33O.....',
+  '....O4O3332O....',
+  '....O3O3322O....',
+  '....O3O2222O....',
+  '....OSO2222O....',
+  '....OOPPPPPO....',
 ];
-const LEGS_SIDE = [
-  ['.....OPPPPO.....', '.....OPPPpO.....', '.....OPPPpO.....', '.....OBBBbO.....', '....OBBBBbO.....', '....OOOOOOO.....'],
-  ['....OPPPPPO.....', '...OPPOOpPPO....', '..OPPO..OpPO....', '..OBbO...OBbO...', '.OBBbO...OBbO...', '.OOOOO...OOOO...'],
+const SIDE_LEGS = [
+  ['.....OPPPpO.....', '.....OPPPpO.....', '....OBBBkkO.....', '....OOOOOOO.....'],
+  ['....OPPOOPpO....', '...OPPO.OPpO....', '..OBBkO..OBkO...', '..OOOOO..OOOO...'],
 ];
 
-const PAD = '................';
-
-function liftHalf(rows, side) {
-  // Décale une jambe d'un pixel vers le haut (pas de marche)
-  const out = rows.map((r) => r.split(''));
-  const xs = side === 'L' ? [0, 8] : [8, 16];
+// Pas de marche vu de face/dos : une jambe remonte d'un pixel
+function stepLegs(legs, side) {
+  const rows = legs.map((r) => r.split(''));
+  const [a, b] = side === 'L' ? [0, 8] : [8, 16];
   for (let y = 0; y < rows.length; y++) {
-    for (let x = xs[0]; x < xs[1]; x++) out[y][x] = y + 1 < rows.length ? rows[y + 1][x] : '.';
+    for (let x = a; x < b; x++) rows[y][x] = y + 1 < legs.length ? legs[y + 1][x] : '.';
   }
-  return out.map((r) => r.join(''));
+  return rows.map((r) => r.join(''));
 }
 
+const EMPTY = '................';
+
 function charRows(dir, frame) {
+  let head, body, legs;
   if (dir === 'l' || dir === 'r') {
-    const legs = LEGS_SIDE[frame === 1 ? 1 : 0];
-    const bob = frame === 1 ? 1 : 0;
-    return [...Array(6 + bob).fill(PAD), ...HEAD_SIDE, ...BODY_SIDE, ...legs].slice(0, 32);
+    head = SIDE_HEAD; body = SIDE_BODY; legs = SIDE_LEGS[frame === 1 ? 1 : 0];
+  } else {
+    head = dir === 'u' ? BACK_HEAD : FRONT_HEAD;
+    body = dir === 'u' ? BACK_BODY : FRONT_BODY;
+    legs = frame === 1 ? stepLegs(FRONT_LEGS, 'L') : frame === 2 ? stepLegs(FRONT_LEGS, 'R') : FRONT_LEGS;
   }
-  const head = dir === 'u' ? HEAD_UP : HEAD_DOWN;
-  const body = dir === 'u' ? BODY_UP : BODY_DOWN;
-  let legs = LEGS_FRONT;
-  if (frame === 1) legs = liftHalf(LEGS_FRONT, 'L');
-  if (frame === 2) legs = liftHalf(LEGS_FRONT, 'R');
-  const bob = frame ? 1 : 0;
-  return [...Array(6 + bob).fill(PAD), ...head, ...body, ...legs].slice(0, 32);
+  const bob = frame ? 1 : 0; // le haut du corps descend d'un pixel pendant les pas
+  const upper = [...head, ...body];
+  const rows = Array(32).fill(EMPTY);
+  const legTop = 31 - legs.length;
+  legs.forEach((r, i) => { rows[legTop + i] = r; });
+  upper.forEach((r, i) => { rows[legTop - upper.length + bob + i] = r; });
+  return rows;
 }
 
 const spriteCache = new Map();
@@ -160,8 +144,10 @@ export function playerSprite(colorIdx, dir, frame) {
   const ramp = PLAYER_COLORS[colorIdx % PLAYER_COLORS.length].ramp;
   const map = {
     O: C.outline, 1: ramp[0], 2: ramp[1], 3: ramp[2], 4: ramp[3],
-    S: C.skin[1], s: C.skin[0], h: C.skin[2], E: C.eye, W: C.white,
-    P: C.pants[1], p: C.pants[0], B: C.boots[1], b: C.boots[0], L: C.bark[1],
+    a: C.hair[0], b: C.hair[1], c: C.hair[2], d: C.hair[3],
+    S: C.skin[1], s: C.skin[0], h: C.skin[2], E: C.eye,
+    W: C.shirt[1], w: C.shirt[0],
+    P: C.pants[1], p: C.pants[0], q: C.pants[2], B: C.shoes[1], k: C.shoes[0],
   };
   const rows = charRows(dir, frame);
   const mirror = dir === 'r';
@@ -182,7 +168,7 @@ export function avatarURL(colorIdx, scale = 3) {
   const c = canvas(16 * scale, 24 * scale);
   const g = c.getContext('2d');
   g.imageSmoothingEnabled = false;
-  g.drawImage(src, 0, 6, 16, 24, 0, 0, 16 * scale, 24 * scale);
+  g.drawImage(src, 0, 8, 16, 24, 0, 0, 16 * scale, 24 * scale);
   return c.toDataURL();
 }
 
@@ -194,141 +180,165 @@ function tile(fn) {
   return c;
 }
 
-// Petite touffe d'herbe en "v", comme dans les RPG 16-bit
-function tuft(g, x, y, light = true) {
-  const [dark, , , hi] = C.grass;
-  px(g, x, y + 1, dark); px(g, x + 1, y + 2, dark); px(g, x + 3, y + 1, dark); px(g, x + 2, y + 2, dark);
-  if (light) { px(g, x, y, hi); px(g, x + 3, y, hi); }
+// Touffe d'herbe claire avec un pied plus sombre
+function tuft(g, x, y) {
+  const [, dark, , light, pale] = C.grass;
+  px(g, x, y, light); px(g, x + 2, y, light);
+  px(g, x + 1, y + 1, pale); px(g, x, y + 1, dark); px(g, x + 2, y + 1, dark);
+  px(g, x + 4, y + 1, light); px(g, x + 4, y + 2, dark); px(g, x + 3, y + 2, dark);
 }
 
 function grass(variant) {
   return tile((g) => {
     g.fillStyle = C.grass[2];
     g.fillRect(0, 0, 16, 16);
-    // Légère trame de teinte pour éviter l'aplat
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      if (((x * 5 + y * 3 + variant * 7) % 17) === 0) px(g, x, y, C.grass[1]);
-      else if (((x * 3 + y * 7 + variant * 5) % 23) === 0) px(g, x, y, C.grass[3]);
-    }
-    const tufts = variant === 0 ? [[2, 3], [9, 9]] : variant === 1 ? [[10, 2], [3, 11]] : [[6, 6]];
-    for (const [x, y] of tufts) tuft(g, x, y);
+    const spots = [[[2, 3], [9, 10]], [[9, 2], [2, 11]], [[5, 6]]][variant];
+    for (const [x, y] of spots) tuft(g, x, y);
   });
 }
 
-function flowers() {
+function path() {
+  return tile((g) => {
+    g.fillStyle = C.path[2];
+    g.fillRect(0, 0, 16, 16);
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      if ((x * 7 + y * 11) % 23 === 0) px(g, x, y, C.path[0]);
+      else if ((x * 5 + y * 3) % 17 === 0) px(g, x, y, C.path[1]);
+      else if ((x * 3 + y * 13) % 19 === 0) px(g, x, y, C.path[3]);
+    }
+  });
+}
+
+// Eau claire : reflets ondulés sur 4 frames
+function water(deep, frame) {
+  return tile((g) => {
+    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
+      const w = Math.round(1.5 * Math.sin(((x + frame * 4) / 16) * Math.PI * 2));
+      const k = (((y + w) % 8) + 8) % 8;
+      let col = deep ? C.deep[1] : C.water[2];
+      if (k === 0) col = deep ? C.deep[2] : C.water[3];
+      else if (k === 4) col = deep ? C.deep[0] : C.water[1];
+      else if (!deep && k === 1 && ((x + frame * 3) % 6) === 0) col = C.water[4];
+      px(g, x, y, col);
+    }
+  });
+}
+
+// Fleurs : deux corolles avec feuilles
+function flowers(colors) {
   const c = grass(2);
   const g = c.getContext('2d');
-  const [dark, mid, light, heart] = C.flower;
-  for (const [x, y] of [[4, 3], [10, 9]]) {
-    // feuilles
-    px(g, x - 2, y + 3, C.leaf[2]); px(g, x - 1, y + 4, C.leaf[2]); px(g, x + 2, y + 3, C.leaf[2]); px(g, x + 1, y + 4, C.leaf[1]);
-    // pétales
-    for (const [dx, dy, col] of [[0, -1, light], [-1, 0, mid], [1, 0, mid], [0, 1, dark], [-1, -1, light], [1, 1, dark], [-1, 1, dark], [1, -1, mid]]) px(g, x + dx, y + dy, col);
-    px(g, x, y, heart);
-    px(g, x, y + 2, C.outline);
+  const [dk, md, lt] = colors;
+  for (const [x, y] of [[4, 4], [11, 10]]) {
+    px(g, x - 2, y + 3, C.tall[2]); px(g, x - 1, y + 3, C.tall[3]); px(g, x + 1, y + 3, C.tall[2]); px(g, x + 2, y + 3, C.tall[1]);
+    px(g, x - 2, y + 4, C.tall[1]); px(g, x + 2, y + 4, C.tall[1]);
+    const petals = [[-1, -1, lt], [0, -1, lt], [1, -1, md], [-1, 0, lt], [1, 0, md], [-1, 1, md], [0, 1, md], [1, 1, dk],
+      [-2, 0, md], [2, 0, dk], [0, -2, lt], [0, 2, dk]];
+    for (const [dx, dy, col] of petals) px(g, x + dx, y + dy, col);
+    px(g, x, y, C.flowerHeart);
   }
   return c;
 }
 
-function sand() {
-  return tile((g) => {
-    g.fillStyle = C.sand[2];
-    g.fillRect(0, 0, 16, 16);
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      if ((x * 7 + y * 11) % 19 === 0) px(g, x, y, C.sand[0]);
-      else if ((x * 5 + y * 3) % 13 === 0) px(g, x, y, C.sand[1]);
-      else if ((x * 3 + y * 13) % 17 === 0) px(g, x, y, C.sand[3]);
+// Feuilles en éventail : chaque feuille est un fuseau ombré
+function leaves(m, list, levels) {
+  for (const [bx, by, ang, len, wid] of list) {
+    const ux = Math.cos(ang), uy = Math.sin(ang);
+    for (let y = 0; y < m.h; y++) {
+      for (let x = 0; x < m.w; x++) {
+        const rx = x + 0.5 - bx, ry = y + 0.5 - by;
+        const u = rx * ux + ry * uy, v = -rx * uy + ry * ux;
+        if (u < 0 || u > len) continue;
+        const t = u / len;
+        const hw = wid * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.15)), 0.8);
+        if (Math.abs(v) > hw) continue;
+        const l = 0.35 + t * 0.5 + (v < 0 ? 0.2 : -0.15) + dither(x, y);
+        m.v[y * m.w + x] = clamp(Math.floor(l * levels), 0, levels - 1);
+      }
     }
-  });
+  }
 }
 
-// Eau : lignes de vagues sinusoïdales qui bouclent sur 16 px et défilent sur 4 frames
-function water(deep, frame) {
-  const pal = deep ? C.deep : C.water;
-  return tile((g) => {
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      const w = Math.round(1.6 * Math.sin(((x + frame * 4) / 16) * Math.PI * 2));
-      const k = (((y + w) % 8) + 8) % 8;
-      let col = deep ? pal[0] : pal[1];
-      if (k === 0) col = deep ? pal[2] : pal[3];
-      else if (k === 1) col = deep ? pal[1] : pal[2];
-      else if (!deep && k === 5 && ((x + frame) & 3) === 0) col = pal[4];
-      px(g, x, y, col);
-    }
-  });
+function tallGrass() {
+  const c = grass(1);
+  const g = c.getContext('2d');
+  g.fillStyle = C.grass[0];
+  g.fillRect(3, 14, 10, 1);
+  const m = makeMask(16, 16);
+  const P = Math.PI;
+  leaves(m, [
+    [8, 14, -P * 0.92, 7, 2.2], [8, 14, -P * 0.08, 7, 2.2],
+    [8, 14, -P * 0.72, 9, 2.4], [8, 14, -P * 0.28, 9, 2.4],
+    [8, 14, -P * 0.5, 10, 2.6],
+  ], 4);
+  drawMask(g, m, C.tall.slice(1), C.tall[0]);
+  return c;
 }
 
 function bush() {
-  const c = grass(1);
+  const c = grass(0);
   const g = c.getContext('2d');
-  // ombre au sol
   g.fillStyle = C.grass[0];
   g.fillRect(2, 13, 12, 2);
-  const res = shadeBlobs(14, 14, [[7, 8, 6.3], [5, 6, 4.2], [9.5, 6.2, 4]], 4);
-  drawShaded(g, 1, 0, 14, 14, res, C.bush, C.outline);
+  const m = makeMask(16, 15);
+  blob(m, 8, 9, 6.5, 5.5, 4);
+  const top = makeMask(16, 15);
+  blob(top, 5.5, 6.5, 3.8, 3.4, 4, 0.15); blob(top, 10.5, 6.5, 3.8, 3.4, 4, 0.05); blob(top, 8, 4.5, 3.4, 3, 4, 0.2);
+  for (let i = 0; i < m.v.length; i++) if (top.v[i] >= 0) m.v[i] = top.v[i];
+  drawMask(g, m, C.tall.slice(1), C.tall[0]);
   return c;
 }
 
-/* ───────────────────────── ARBRES (32x32, 2x2 tuiles) ───────────────────────── */
-
-function trunk(g, top, bottom) {
-  const [d, m, l, hi] = C.bark;
-  for (let y = top; y <= bottom; y++) {
-    const w = y > bottom - 3 ? 1 : 0; // racines qui s'évasent
-    for (let x = 12 - w; x <= 19 + w; x++) {
-      let col = x <= 13 - w ? l : x >= 18 + w ? d : m;
-      if (x === 14 && y % 3 === 0) col = hi;
-      if (x === 17 && y % 4 === 1) col = d;
-      px(g, x, y, col);
-    }
-    px(g, 11 - w, y, C.outline); px(g, 20 + w, y, C.outline);
-  }
-  for (let x = 11; x <= 20; x++) px(g, x, bottom + 1, C.outline);
-}
-
-function roundTree() {
-  const c = canvas(32, 32);
+function rock() {
+  const c = grass(2);
   const g = c.getContext('2d');
-  trunk(g, 20, 29);
-  const blobs = [
-    [16, 14, 9.5], [9, 13, 6.5], [23, 13, 6.5], [16, 8, 8], [10, 8.5, 5], [22, 8.5, 5], [16, 5, 4.8],
-  ];
-  const res = shadeBlobs(32, 26, blobs, 5);
-  drawShaded(g, 0, 0, 32, 26, res, ['', ...C.leaf], C.outline);
+  g.fillStyle = C.grass[0];
+  g.fillRect(2, 13, 12, 2);
+  const m = makeMask(16, 15);
+  blob(m, 8, 9, 6.2, 5.2, 4);
+  drawMask(g, m, C.rock.slice(1), C.rock[0]);
+  px(g, 9, 8, C.rock[1]); px(g, 10, 9, C.rock[1]); px(g, 10, 10, C.rock[2]);
+  px(g, 5, 6, C.rock[4]); px(g, 6, 6, C.rock[4]);
   return c;
 }
+
+/* ───────────────────────── SAPIN (32x32 = 2x2 tuiles) ─────────────────────────
+   Cône à trois étages arrondis, éclairé en haut à gauche, contour vert sombre. */
 
 function pineTree() {
   const c = canvas(32, 32);
   const g = c.getContext('2d');
-  trunk(g, 23, 29);
-  // Étages triangulaires, ombrés gauche → droite, avec bord inférieur festonné
-  const tiers = [[2, 10, 6], [7, 17, 10], [13, 25, 14]]; // [haut, bas, demi-largeur max]
-  const ramp = C.pine;
-  const filled = new Set();
-  tiers.forEach(([top, bot, hw]) => {
+  // Ombre au sol
+  g.fillStyle = C.grass[0];
+  for (let y = 27; y <= 31; y++) {
+    const hw = Math.round(12 * Math.sqrt(Math.max(0, 1 - ((y - 29) / 3) ** 2)));
+    g.fillRect(16 - hw, y, hw * 2, 1);
+  }
+  // Tronc
+  for (let y = 25; y <= 29; y++) {
+    px(g, 13, y, C.outline);
+    for (let x = 14; x <= 17; x++) px(g, x, y, x === 14 ? C.bark[2] : x === 17 ? C.bark[0] : C.bark[1]);
+    px(g, 18, y, C.outline);
+  }
+  for (let x = 13; x <= 18; x++) px(g, x, 30, C.outline);
+
+  const m = makeMask(32, 28);
+  const tiers = [[1, 11, 6.5], [6, 19, 10.5], [12, 26, 14]]; // haut, bas, demi-largeur
+  for (const [top, bot, hw] of tiers) {
     for (let y = top; y <= bot; y++) {
       const t = (y - top) / (bot - top);
-      const half = Math.max(1, Math.round(hw * t + 0.5));
-      for (let x = 16 - half; x < 16 + half; x++) {
-        const rel = (x - (16 - half)) / (2 * half);       // 0 = gauche (éclairé) → 1 = droite
-        let v = 4 - rel * 3.6 - t * 0.8 + (BAYER[y & 1][x & 1] - 1.5) * 0.35;
-        if (y === bot && (x & 1)) continue;                // feston
-        if (y >= bot - 1) v -= 1.2;                        // ombre sous chaque étage
-        px(g, x, y, ramp[Math.max(0, Math.min(4, Math.round(v)))]);
-        filled.add(y * 32 + x);
+      // profil arrondi : s'élargit vite puis se referme en bas de l'étage
+      const w = hw * Math.sin(Math.min(1, t * 1.25) * Math.PI / 2) * (t > 0.85 ? 1 - (t - 0.85) * 1.4 : 1);
+      for (let x = 0; x < 32; x++) {
+        const dx = (x + 0.5 - 16) / Math.max(1, w);
+        if (Math.abs(dx) > 1) continue;
+        let l = 0.72 - 0.36 * dx - 0.38 * t + (t < 0.3 ? 0.12 : 0) + dither(x, y) * 0.45;
+        if (t > 0.86) l -= 0.3; // ombre sous l'étage
+        m.v[y * 32 + x] = clamp(Math.floor(l * 5), 0, 4);
       }
     }
-  });
-  // Contour
-  const img = new Set(filled);
-  for (const k of img) {
-    const x = k % 32, y = Math.floor(k / 32);
-    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const n = (y + dy) * 32 + x + dx;
-      if (!img.has(n) && x + dx >= 0 && x + dx < 32 && y + dy >= 0) px(g, x + dx, y + dy, C.outline);
-    }
   }
+  drawMask(g, m, C.pine.slice(1), C.pine[0]);
   return c;
 }
 
@@ -336,28 +346,35 @@ function pineTree() {
 
 export function buildTiles() {
   const frames = [0, 1, 2, 3].map((f) => ({ [T.DEEP]: water(true, f), [T.WATER]: water(false, f) }));
-  const grasses = [grass(0), grass(1)];
+  const g0 = grass(0), g1 = grass(1);
   const fixed = {
-    [T.SAND]: sand(),
-    [T.GRASS]: grasses[0],
-    [T.GRASS2]: grasses[1],
-    [T.FLOWERS]: flowers(),
+    [T.PATH]: path(),
+    [T.GRASS]: g0,
+    [T.GRASS2]: g1,
+    [T.FLOWERS]: flowers(C.flowerRed),
+    [T.TALL]: tallGrass(),
     [T.BUSH]: bush(),
-    [T.TREE_TOP]: grasses[0],
-    [T.TREE_BOT]: grasses[1],
+    [T.ROCK]: rock(),
+    [T.TREE_TOP]: g0,
+    [T.TREE_BOT]: g1,
   };
-  const trees = { [TREE_ROUND]: roundTree(), [TREE_PINE]: pineTree() };
+  const orange = flowers(C.flowerOrange);
+  const pine = pineTree();
   return {
-    get(type, frame) { return fixed[type] || frames[frame & 3][type]; },
-    tree(kind) { return trees[kind]; },
+    get(type, frame, x = 0, y = 0) {
+      if (type === T.FLOWERS && ((x * 7 + y * 3) & 3) === 0) return orange;
+      return fixed[type] || frames[frame & 3][type];
+    },
+    tree() { return pine; },
   };
 }
 
 // Couleurs de la minimap
 export const MINIMAP_COLORS = {
-  [T.DEEP]: C.deep[1], [T.WATER]: C.water[2], [T.SAND]: C.sand[2],
-  [T.GRASS]: C.grass[2], [T.GRASS2]: C.grass[2], [T.FLOWERS]: C.flower[1],
-  [T.BUSH]: C.bush[2], [T.TREE_TOP]: C.leaf[2], [T.TREE_BOT]: C.leaf[1],
+  [T.DEEP]: C.deep[1], [T.WATER]: C.water[2], [T.PATH]: C.path[2],
+  [T.GRASS]: C.grass[2], [T.GRASS2]: C.grass[2], [T.FLOWERS]: C.flowerRed[1],
+  [T.TALL]: C.tall[2], [T.BUSH]: C.tall[1], [T.ROCK]: C.rock[2],
+  [T.TREE_TOP]: C.pine[3], [T.TREE_BOT]: C.pine[2],
 };
 
 // Fond de page : la tuile d'herbe en motif

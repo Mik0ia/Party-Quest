@@ -1,14 +1,16 @@
 import { Perlin, hash2 } from './noise.js';
 
 export const T = {
-  DEEP: 0, WATER: 1, SAND: 2, GRASS: 3, GRASS2: 4, FLOWERS: 5, BUSH: 6,
-  TREE_TOP: 7,  // moitié haute d'un arbre 2x2 : on passe derrière le feuillage
-  TREE_BOT: 8,  // moitié basse (tronc) : bloquante
+  DEEP: 0, WATER: 1, PATH: 2, GRASS: 3, GRASS2: 4, FLOWERS: 5,
+  TALL: 6,      // herbes hautes : décor traversable
+  BUSH: 7,      // buisson : bloquant
+  ROCK: 8,      // rocher : bloquant
+  TREE_TOP: 9,  // moitié haute d'un sapin 2x2 : on passe derrière le feuillage
+  TREE_BOT: 10, // moitié basse (tronc) : bloquante
 };
-const BLOCKING = new Set([T.DEEP, T.WATER, T.BUSH, T.TREE_BOT]);
+const BLOCKING = new Set([T.DEEP, T.WATER, T.BUSH, T.ROCK, T.TREE_BOT]);
 
 export const isWater = (t) => t === T.DEEP || t === T.WATER;
-export const TREE_ROUND = 1, TREE_PINE = 2;
 
 // Overworld infini généré à la volée : chaque tuile ne dépend que de (x, y, seed)
 export class World {
@@ -16,59 +18,52 @@ export class World {
     this.seed = seed >>> 0;
     this.elev = new Perlin(this.seed);
     this.veg = new Perlin((this.seed ^ 0x9e3779b9) >>> 0);
-    this.kind = new Perlin((this.seed ^ 0x51ed270b) >>> 0);
+    this.paths = new Perlin((this.seed ^ 0x51ed270b) >>> 0);
+    this.patch = new Perlin((this.seed ^ 0x2545f491) >>> 0);
     this.cache = new Map();
     this.anchors = new Map();
     this._spawn = null;
   }
 
-  // Terrain sans les arbres : eau, sable, herbe, fleurs, buissons
+  // Terrain sans les arbres
   base(x, y) {
     const e = this.elev.fbm(x / 26, y / 26, 4);
     if (e < -0.24) return T.DEEP;
-    if (e < -0.13) return T.WATER;
-    if (e < -0.09) return T.SAND;
+    if (e < -0.12) return T.WATER;
+    // Chemins de sable : le long des "crêtes" d'un bruit basse fréquence → tracés sinueux
+    if (Math.abs(this.paths.fbm(x / 34, y / 34, 2)) < 0.032) return T.PATH;
     const r = hash2(x, y, this.seed);
-    const v = this.veg.fbm(x / 11, y / 11, 3);
-    if (v > -0.02 && v < 0.06 && r < 0.06) return T.BUSH;
-    if (r < 0.05) return T.FLOWERS;
+    if (this.patch.fbm(x / 9, y / 9, 2) > 0.22) return T.TALL;
+    if (r < 0.012) return T.ROCK;
+    if (r < 0.03) return T.BUSH;
+    if (r < 0.07) return T.FLOWERS;
     return r < 0.55 ? T.GRASS : T.GRASS2;
   }
 
-  // Les arbres occupent 2x2 tuiles, posés sur une grille en quinconce
-  // (comme les forêts des RPG 16-bit). Renvoie 0, TREE_ROUND ou TREE_PINE.
+  // Sapins de 2x2 tuiles, alignés en rangées comme dans les forêts des RPG GBA
   treeAt(ax, ay) {
     const key = ax * 100003 + ay;
     let k = this.anchors.get(key);
     if (k !== undefined) return k;
     k = 0;
-    const v = this.veg.fbm(ax / 11, ay / 11, 3);
+    const v = this.veg.fbm(ax / 12, ay / 12, 3);
     const r = hash2(ax, ay, this.seed ^ 0x77);
-    if (v > 0.06 || (v > 0.0 && r < 0.45) || r < 0.015) {
-      let ok = true;
-      for (let dy = 0; dy < 2 && ok; dy++)
-        for (let dx = 0; dx < 2 && ok; dx++) {
+    if (v > 0.07 || (v > 0.01 && r < 0.4) || r < 0.012) {
+      k = 1;
+      for (let dy = 0; dy < 2 && k; dy++)
+        for (let dx = 0; dx < 2 && k; dx++) {
           const b = this.base(ax + dx, ay + dy);
-          if (isWater(b) || b === T.SAND) ok = false;
+          if (isWater(b) || b === T.PATH) k = 0;
         }
-      if (ok) k = this.kind.fbm(ax / 40, ay / 40, 2) > 0.05 ? TREE_PINE : TREE_ROUND;
     }
     this.anchors.set(key, k);
     return k;
   }
 
-  // Coin haut-gauche de l'emplacement d'arbre qui contient (x, y)
-  anchorOf(x, y) {
-    const ay = y - (((y % 2) + 2) % 2);
-    const off = (((ay / 2) % 2) + 2) % 2;
-    const ax = x - (((x - off) % 2) + 2) % 2;
-    return [ax, ay];
-  }
-
   tree(x, y) {
-    const [ax, ay] = this.anchorOf(x, y);
-    const kind = this.treeAt(ax, ay);
-    return kind ? { ax, ay, kind } : null;
+    const ax = x - (((x % 2) + 2) % 2);
+    const ay = y - (((y % 2) + 2) % 2);
+    return this.treeAt(ax, ay) ? { ax, ay } : null;
   }
 
   tile(x, y) {

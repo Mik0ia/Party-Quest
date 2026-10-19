@@ -9,9 +9,9 @@ HTML / JavaScript pur (aucune compilation), Firebase pour les comptes et le temp
 - Connexion Google, avec un compte par joueur : niveau 1, 0 EXP, 0 or (pas encore utilisés)
 - Créer ou rejoindre une room avec un code à 4 caractères, ou avec un lien `?room=CODE`
 - Salon jusqu'à 5 joueurs, puis l'hôte lance la partie
-- Overworld infini généré en bruit de Perlin à partir d'une seed par room : forêts, lacs, berges. L'eau, les buissons et les troncs bloquent ; les arbres font 2×2 cases et on passe derrière leur feuillage
+- Overworld infini généré en bruit de Perlin (seed par room) : forêts de sapins 2×2, lacs aux bords arrondis, chemins de sable sinueux, herbes hautes, fleurs. L'eau, les buissons, les rochers et les troncs bloquent ; on passe derrière le feuillage des sapins
 - Déplacements sur grille, réplication de la position et de l'orientation de chaque joueur
-- Direction artistique 16-bit (style GBA) : arbres 32×32 et personnages 16×32 dessinés en code dans `js/sprites.js`, ombrage avec trame, eau animée ; chaque joueur a une palette imposée (rouge, bleu, vert, violet, or)
+- Direction artistique façon GBA (tileset original généré en code dans `js/sprites.js`) : herbe menthe, sapins 32×32, personnages 16×32 avec une hitbox d'une case ; chaque joueur a une palette imposée (rouge, bleu, vert, violet, or)
 - Mode démo (solo + 2 bots) actif tant que Firebase n'est pas configuré, ou avec `?demo` dans l'URL
 
 ## Mise en place

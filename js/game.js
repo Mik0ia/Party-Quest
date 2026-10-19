@@ -184,8 +184,9 @@ export class Game {
       for (let tx = x0; tx <= x1; tx++) {
         const t = W.tile(tx, ty);
         const sx = tx * TS - cx, sy = ty * TS - cy;
-        g.drawImage(this.tiles.get(t, wf), sx, sy);
+        g.drawImage(this.tiles.get(t, wf, tx, ty), sx, sy);
         if (isWater(t)) this.drawShore(g, tx, ty, sx, sy);
+        else if (t === T.PATH) this.drawPathEdge(g, tx, ty, sx, sy);
       }
     }
 
@@ -202,13 +203,6 @@ export class Game {
         trees.push(tr);
       }
     }
-    g.fillStyle = 'rgba(20, 60, 30, 0.28)';
-    for (const tr of trees) {
-      const sx = tr.ax * TS - cx, sy = tr.ay * TS - cy;
-      g.fillRect(sx + 6, sy + 29, 20, 3);
-      g.fillRect(sx + 9, sy + 32, 14, 1);
-    }
-
     // 3. Arbres et personnages triés par leur base : on passe derrière les feuillages
     const drawables = [];
     for (const tr of trees) drawables.push({ base: tr.ay + 1.5, tree: tr });
@@ -217,7 +211,7 @@ export class Game {
 
     for (const d of drawables) {
       if (d.tree) {
-        g.drawImage(this.tiles.tree(d.tree.kind), d.tree.ax * TS - cx, d.tree.ay * TS - cy);
+        g.drawImage(this.tiles.tree(), d.tree.ax * TS - cx, d.tree.ay * TS - cy);
         continue;
       }
       const e = d.ent;
@@ -225,10 +219,10 @@ export class Game {
       const walking = e.moving || now - e.stopAt < 60;
       const frame = walking ? 1 + (Math.floor(now / MOVE_MS) & 1) : 0;
       const sx = Math.round(e.x * TS - cx), sy = Math.round(e.y * TS - cy);
-      g.fillStyle = 'rgba(20, 40, 30, 0.3)';
-      g.fillRect(sx + 3, sy + 14, 10, 2);
-      g.fillRect(sx + 5, sy + 16, 6, 1);
-      g.drawImage(playerSprite(color, e.dir, frame), sx, sy - 17);
+      g.fillStyle = 'rgba(30, 90, 70, 0.45)';
+      g.fillRect(sx + 4, sy + 13, 8, 3);
+      g.fillRect(sx + 3, sy + 14, 10, 1);
+      g.drawImage(playerSprite(color, e.dir, frame), sx, sy - 16);
     }
 
     // 4. Noms au-dessus des têtes (toujours visibles, même derrière un arbre)
@@ -240,31 +234,51 @@ export class Game {
       const meta = this.meta.get(e.uid);
       if (!meta) continue;
       const sx = Math.round(e.x * TS - cx), sy = Math.round(e.y * TS - cy);
-      this.drawName(g, meta.name, sx + 8, sy - 10, playerTint(meta.color));
+      this.drawName(g, meta.name, sx + 8, sy - 7, playerTint(meta.color));
     }
 
     if (now - this.lastMini > 200) { this.lastMini = now; this.renderMinimap(); }
   }
 
-  drawShore(g, tx, ty, sx, sy) {
-    // Berge en terre et galets (style RPG 16-bit) sur les côtés de l'eau qui touchent la terre
-    const land = (x, y) => !isWater(this.world.tile(x, y));
-    const [dk, md, lt, hi] = C.shore;
-    const band = (horizontal, fixed, inward) => {
-      for (let i = 0; i < 16; i++) {
-        const cells = [[fixed, dk], [fixed + inward, (i & 1) ? md : lt], [fixed + 2 * inward, (i % 4 === 0) ? hi : md]];
-        for (const [o, col] of cells) {
-          g.fillStyle = col;
-          if (horizontal) g.fillRect(sx + i, sy + o, 1, 1); else g.fillRect(sx + o, sy + i, 1, 1);
-        }
-        g.fillStyle = C.water[0];
-        if (horizontal) g.fillRect(sx + i, sy + fixed + 3 * inward, 1, 1); else g.fillRect(sx + fixed + 3 * inward, sy + i, 1, 1);
-      }
+  // Bords arrondis entre deux types de sol : pour chaque côté qui touche "l'extérieur",
+  // une bande de couleurs ; les coins extérieurs sont arrondis avec la couleur voisine.
+  edgeBand(g, sx, sy, sides, colors, cornerFill) {
+    const [n, sdir, w, e] = sides;
+    colors.forEach((col, i) => {
+      g.fillStyle = col;
+      if (n) g.fillRect(sx, sy + i, 16, 1);
+      if (sdir) g.fillRect(sx, sy + 15 - i, 16, 1);
+      if (w) g.fillRect(sx + i, sy, 1, 16);
+      if (e) g.fillRect(sx + 15 - i, sy, 1, 16);
+    });
+    // Coins arrondis : quart de cercle de 3 px rempli avec le sol voisin
+    const R = [[0, 0], [1, 0], [2, 0], [0, 1], [0, 2], [1, 1]];
+    const corner = (on, fx, fy) => {
+      if (!on) return;
+      g.fillStyle = cornerFill;
+      for (const [x, y] of R) g.fillRect(sx + (fx ? 15 - x : x), sy + (fy ? 15 - y : y), 1, 1);
+      g.fillStyle = colors[0];
+      for (const [x, y] of [[3, 0], [2, 1], [1, 2], [0, 3]]) g.fillRect(sx + (fx ? 15 - x : x), sy + (fy ? 15 - y : y), 1, 1);
     };
-    if (land(tx, ty - 1)) band(true, 0, 1);
-    if (land(tx, ty + 1)) band(true, 15, -1);
-    if (land(tx - 1, ty)) band(false, 0, 1);
-    if (land(tx + 1, ty)) band(false, 15, -1);
+    corner(n && w, false, false); corner(n && e, true, false);
+    corner(sdir && w, false, true); corner(sdir && e, true, true);
+  }
+
+  drawShore(g, tx, ty, sx, sy) {
+    const land = (x, y) => !isWater(this.world.tile(x, y));
+    const sides = [land(tx, ty - 1), land(tx, ty + 1), land(tx - 1, ty), land(tx + 1, ty)];
+    if (!sides.some(Boolean)) return;
+    this.edgeBand(g, sx, sy, sides, [C.water[0], C.water[3], C.water[2]], C.grass[2]);
+  }
+
+  drawPathEdge(g, tx, ty, sx, sy) {
+    const other = (x, y) => {
+      const t = this.world.tile(x, y);
+      return t !== T.PATH && !isWater(t);
+    };
+    const sides = [other(tx, ty - 1), other(tx, ty + 1), other(tx - 1, ty), other(tx + 1, ty)];
+    if (!sides.some(Boolean)) return;
+    this.edgeBand(g, sx, sy, sides, [C.pathEdge[0], C.pathEdge[1]], C.grass[2]);
   }
 
   drawName(g, name, x, y, color) {
