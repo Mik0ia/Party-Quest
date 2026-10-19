@@ -3,7 +3,7 @@ import { buildTiles, playerSprite, avatarURL, MINIMAP_COLORS } from './sprites.j
 import { C, PLAYER_COLORS, playerTint } from './palette.js';
 
 const TS = 16;                                // tuiles 16x16
-const VIEW_W = 21 * TS, VIEW_H = 15 * TS;     // taille de vue visée : 21 x 15 tuiles
+const VIEW_W = 31 * TS, VIEW_H = 25 * TS;     // taille de vue visée : 31 x 25 tuiles
 const MOVE_MS = 160;                   // durée d'un pas d'une tuile
 const DIRS = { u: [0, -1], d: [0, 1], l: [-1, 0], r: [1, 0] };
 // e.code = position physique de la touche : WASD en QWERTY = ZQSD en AZERTY
@@ -155,12 +155,12 @@ export class Game {
   /* ───────── Rendu ───────── */
 
   resize() {
-    // Vue d'environ 21 x 15 tuiles ; le canvas est rendu à une échelle entière ≥ au zoom
+    // Vue d'environ 31 x 25 tuiles ; le canvas est rendu à une échelle entière ≥ au zoom
     // puis réduit légèrement par le navigateur, ce qui garde des pixels nets.
     const r = this.view.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     let zoom = Math.min(r.width / VIEW_W, r.height / VIEW_H);
-    zoom = Math.max(zoom, r.width < 500 ? 1.5 : 1);
+    zoom = Math.max(zoom, 1);
     this.vw = Math.ceil(r.width / zoom);
     this.vh = Math.ceil(r.height / zoom);
     this.scale = Math.max(1, Math.ceil(zoom * dpr - 0.01));
