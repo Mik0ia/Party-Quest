@@ -12,10 +12,25 @@ export const T = {
   BARREL: 12,   // tonneau : bloquant
   TENT_TOP: 13, // haut d'une tente de campement 2x2 : on passe derrière
   TENT_BOT: 14, // bas de la tente : bloquant
+  // Formations rocheuses (falaises) : 3 couches selon la hauteur du relief
+  TOP1: 15, TOP2: 16, TOP3: 17,     // dessus d'un plateau rocheux de couche 1, 2 ou 3
+  FACE1: 18, FACE2: 19, FACE3: 20,  // paroi de falaise sous un plateau de couche 1, 2 ou 3
 };
-const BLOCKING = new Set([T.DEEP, T.WATER, T.BUSH, T.ROCK, T.TREE_BOT, T.SIGN, T.BARREL, T.TENT_BOT]);
+
+// Seuils de hauteur du bruit de Perlin (valeurs de -0.7 à 0.7 environ) :
+//   < -0.24 eau profonde · < -0.12 eau · sol · > 0.19 roche · > 0.26 2e couche · > 0.33 3e couche
+export const ELEV = { DEEP: -0.24, WATER: -0.12, ROCK: [0.19, 0.26, 0.33] };
+
+const BLOCKING = new Set([
+  T.DEEP, T.WATER, T.BUSH, T.ROCK, T.TREE_BOT, T.SIGN, T.BARREL, T.TENT_BOT,
+  T.TOP1, T.TOP2, T.TOP3, T.FACE1, T.FACE2, T.FACE3,
+]);
 
 export const isWater = (t) => t === T.DEEP || t === T.WATER;
+export const isCliff = (t) => t >= T.TOP1 && t <= T.FACE3;
+export const isFace = (t) => t >= T.FACE1 && t <= T.FACE3;
+// Couche rocheuse visible d'une tuile (0 = sol)
+export const cliffLevel = (t) => (t >= T.TOP1 && t <= T.TOP3 ? t - T.TOP1 + 1 : t >= T.FACE1 ? t - T.FACE1 + 1 : 0);
 
 // Overworld infini généré à la volée : chaque tuile ne dépend que de (x, y, seed)
 export class World {
@@ -30,11 +45,28 @@ export class World {
     this._spawn = null;
   }
 
+  // Hauteur du relief en (x, y)
+  height(x, y) {
+    return this.elev.fbm(x / 26, y / 26, 4);
+  }
+
+  // Couche rocheuse brute (0 = sol, 1 à 3 = roche) d'après les seuils de hauteur
+  level(x, y) {
+    const e = this.height(x, y);
+    let l = 0;
+    for (const th of ELEV.ROCK) if (e > th) l++;
+    return l;
+  }
+
   // Terrain sans les arbres
   base(x, y) {
-    const e = this.elev.fbm(x / 26, y / 26, 4);
-    if (e < -0.24) return T.DEEP;
-    if (e < -0.12) return T.WATER;
+    const e = this.height(x, y);
+    if (e < ELEV.DEEP) return T.DEEP;
+    if (e < ELEV.WATER) return T.WATER;
+    // Falaises : si la case au-dessus est plus haute, on voit sa paroi ici
+    const l = this.level(x, y), up = this.level(x, y - 1);
+    if (up > l) return T.FACE1 + up - 1;
+    if (l > 0) return T.TOP1 + l - 1;
     // Chemins de sable : le long des "crêtes" d'un bruit basse fréquence → tracés sinueux
     if (this.isPath(x, y)) return T.PATH;
     const r = hash2(x, y, this.seed);
@@ -60,7 +92,7 @@ export class World {
     for (let dy = 0; dy < 2; dy++)
       for (let dx = 0; dx < 2; dx++) {
         const b = this.base(ax + dx, ay + dy);
-        if (![T.GRASS, T.GRASS2, T.FLOWERS, T.TALL].includes(b)) return 0;
+        if (![T.GRASS, T.GRASS2, T.FLOWERS, T.TALL].includes(b)) return 0; // jamais sur la roche
       }
     // Couleur de la tente : 1 rouge, 2 bleue
     return 1 + (hash2(ax, ay, this.seed ^ 0x99) < 0.5 ? 0 : 1);
@@ -86,7 +118,7 @@ export class World {
       for (let dy = 0; dy < 2 && k; dy++)
         for (let dx = 0; dx < 2 && k; dx++) {
           const b = this.base(ax + dx, ay + dy);
-          if (isWater(b) || b === T.PATH || this.tentOf(ax + dx, ay + dy)) k = 0;
+          if (isWater(b) || isCliff(b) || b === T.PATH || this.tentOf(ax + dx, ay + dy)) k = 0;
         }
     }
     this.anchors.set(key, k);

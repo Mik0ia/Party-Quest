@@ -433,6 +433,52 @@ function tent(kind) {
   return c;
 }
 
+/* ───────────────────────── FALAISES ─────────────────────────
+   Dessus de plateau en pavés de pierre décalés (motif 8x4 qui boucle sur 16 px),
+   paroi en strates verticales qui s'assombrit vers le pied. Chaque couche est un
+   peu plus claire que celle du dessous pour lire la hauteur. */
+
+function cliffTop(level) {
+  const [dk, md, lt, hi] = C.cliffTop[level - 1];
+  return tile((g) => {
+    for (let y = 0; y < 16; y++) {
+      for (let x = 0; x < 16; x++) {
+        // galets arrondis de 8x8 en quinconce (le motif boucle sur 16 px)
+        const off = ((y >> 3) & 1) * 4;
+        const lx = (x + off) & 7, ly = y & 7;
+        const dx = lx - 3, dy = ly - 3;
+        let col;
+        if (lx === 7 || ly === 7 || (Math.abs(dx) >= 3 && Math.abs(dy) >= 3)) col = dk;
+        else {
+          const l = -(dx + dy) / 6 + dither(x, y) * 0.5;
+          col = l > 0.35 ? hi : l > -0.25 ? lt : md;
+        }
+        px(g, x, y, col);
+      }
+    }
+  });
+}
+
+function cliffFace(level) {
+  const [dk, md, lt, hi] = C.cliffFace[level - 1];
+  const lip = C.cliffTop[level - 1];
+  return tile((g) => {
+    for (let x = 0; x < 16; x++) {
+      // rebord du plateau, puis arête sombre
+      px(g, x, 0, lip[3]); px(g, x, 1, lip[2]); px(g, x, 2, C.outline);
+      for (let y = 3; y < 15; y++) {
+        const t = (y - 3) / 12;
+        const k = (x + (y > 8 ? 2 : 0)) % 5;           // strates verticales décalées à mi-hauteur
+        let col = k === 0 ? dk : k === 1 ? hi : t < 0.4 ? lt : md;
+        if (y === 8 && (x & 1)) col = dk;              // petite corniche
+        if (t > 0.8 && k !== 1) col = dk;              // pied de falaise dans l'ombre
+        px(g, x, y, col);
+      }
+      px(g, x, 15, C.outline);
+    }
+  });
+}
+
 /* ───────────────────────── API ───────────────────────── */
 
 export function buildTiles() {
@@ -452,6 +498,8 @@ export function buildTiles() {
     [T.BARREL]: barrel(),
     [T.TENT_TOP]: g0,
     [T.TENT_BOT]: g1,
+    [T.TOP1]: cliffTop(1), [T.TOP2]: cliffTop(2), [T.TOP3]: cliffTop(3),
+    [T.FACE1]: cliffFace(1), [T.FACE2]: cliffFace(2), [T.FACE3]: cliffFace(3),
   };
   const tents = { 1: tent(1), 2: tent(2) };
   const orange = flowers(C.flowerOrange);
@@ -473,6 +521,8 @@ export const MINIMAP_COLORS = {
   [T.TALL]: C.tall[2], [T.BUSH]: C.tall[1], [T.ROCK]: C.rock[2],
   [T.TREE_TOP]: C.pine[3], [T.TREE_BOT]: C.pine[2],
   [T.SIGN]: C.wood[2], [T.BARREL]: C.wood[1], [T.TENT_TOP]: '#E86858', [T.TENT_BOT]: '#C03838',
+  [T.TOP1]: C.cliffTop[0][2], [T.TOP2]: C.cliffTop[1][2], [T.TOP3]: C.cliffTop[2][3],
+  [T.FACE1]: C.cliffFace[0][1], [T.FACE2]: C.cliffFace[1][1], [T.FACE3]: C.cliffFace[2][1],
 };
 
 // Fond de page : la tuile d'herbe en motif

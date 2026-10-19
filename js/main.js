@@ -127,6 +127,7 @@ function startGame(room) {
     net,
     room,
   });
+  if (isDemo) window.__game = game; // accès console pour tester en mode démo
 }
 
 async function leave(message) {

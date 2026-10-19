@@ -27,6 +27,17 @@ export const C = {
   // Décor médiéval
   canvas: ['#B8A07C', '#E0CCA4', '#F8ECCC'],                        // toile de tente
   wood: ['#4A2C1C', '#7A4C2C', '#A8703C', '#D09A5C'],
+  // Falaises : dessus de plateau par couche (de plus en plus clair en montant) et parois
+  cliffTop: [
+    ['#5E3A34', '#86584C', '#A47262', '#C0907A'],
+    ['#6C4440', '#94665A', '#B48272', '#D0A28C'],
+    ['#7A5048', '#A47466', '#C2927E', '#DEB49C'],
+  ],
+  cliffFace: [
+    ['#24140F', '#422A20', '#5E3E2E', '#7A543E'],
+    ['#2A1812', '#4A3026', '#684634', '#865E46'],
+    ['#301C16', '#52362A', '#724E3A', '#90684E'],
+  ],
   eye: '#283048',
 };
 

@@ -1,4 +1,4 @@
-import { World, T, isWater } from './world.js';
+import { World, T, isWater, isCliff, isFace, cliffLevel } from './world.js';
 import { buildTiles, playerSprite, avatarURL, MINIMAP_COLORS } from './sprites.js';
 import { C, PLAYER_COLORS, playerTint } from './palette.js';
 
@@ -192,6 +192,8 @@ export class Game {
         g.drawImage(this.tiles.get(t, wf, tx, ty), sx, sy);
         if (isWater(t)) this.drawShore(g, tx, ty, sx, sy);
         else if (t === T.PATH) this.drawPathEdge(g, tx, ty, sx, sy);
+        if (isCliff(t)) this.drawCliffEdges(g, t, tx, ty, sx, sy);
+        else if (isFace(W.tile(tx, ty - 1))) this.drawCliffShadow(g, sx, sy);
       }
     }
 
@@ -316,6 +318,35 @@ export class Game {
     if (n && e) { p(15, 1, C.grass[1]); p(14, 1, C.grass[1]); p(15, 2, C.grass[1]); }
     if (s && w) { p(0, 14, C.grass[1]); p(1, 14, C.grass[1]); p(0, 13, C.grass[1]); }
     if (s && e) { p(15, 14, C.grass[1]); p(14, 14, C.grass[1]); p(15, 13, C.grass[1]); }
+  }
+
+  // Contours des formations rocheuses : bords latéraux, rebord supérieur, angles de paroi
+  drawCliffEdges(g, t, tx, ty, sx, sy) {
+    const W = this.world;
+    const lvl = cliffLevel(t);
+    const face = isFace(t);
+    const p = (x, y, col) => { g.fillStyle = col; g.fillRect(sx + x, sy + y, 1, 1); };
+    // Hauteur "visuelle" d'un voisin : une paroi compte pour la couche qu'elle soutient
+    const h = (x, y) => cliffLevel(W.tile(x, y));
+    const sideDk = C.cliffFace[lvl - 1][1];
+    for (const [dx, col0, col1] of [[-1, 0, 1], [1, 15, 14]]) {
+      const nt = W.tile(tx + dx, ty);
+      const lower = h(tx + dx, ty) < lvl || (face && !isFace(nt) && cliffLevel(nt) <= lvl && isCliff(nt) === false);
+      if (!lower) continue;
+      for (let y = face ? 0 : 0; y < 16; y++) { p(col0, y, C.outline); p(col1, y, sideDk); }
+    }
+    if (!face && h(tx, ty - 1) < lvl) {
+      const hi = C.cliffTop[lvl - 1][3];
+      for (let x = 0; x < 16; x++) { p(x, 0, C.outline); p(x, 1, hi); }
+    }
+  }
+
+  // Ombre portée au pied d'une falaise
+  drawCliffShadow(g, sx, sy) {
+    g.fillStyle = 'rgba(10, 20, 10, 0.32)';
+    g.fillRect(sx, sy, 16, 2);
+    g.fillStyle = 'rgba(10, 20, 10, 0.18)';
+    for (let x = 0; x < 16; x += 2) g.fillRect(sx + x, sy + 2, 1, 1);
   }
 
   drawPathEdge(g, tx, ty, sx, sy) {
